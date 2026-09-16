@@ -260,7 +260,7 @@
             { key: 'lowerleg01_R', label: 'Right Knee (ညာဒူးခေါင်း)' }
         ];
 
-        let scene, camera, renderer, controls, floorMesh;
+        let scene, camera, renderer, controls, floorMesh, modelWrapper;
         let characterModel = null, bones = {}, initialRotations = {}, currentDeltas = {};
         let keyLight, fillLight, rimLight, ambientLight;
         let loadedZip = null, colladaLoader, gltfLoader;
@@ -270,7 +270,7 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0e0e13);
 
-            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.05, 1000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
             camera.position.set(0, 1.2, 3.2);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -285,13 +285,19 @@
             controls.target.set(0, 0.9, 0);
             controls.enableDamping = true;
 
+            // Fixed Size Floor Mesh (မော်ဒယ်ထက် ကြီးမသွားစေရန် ပုံသေ 5x5 ထားသည်)
             floorMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(10, 10),
-                new THREE.MeshStandardMaterial({ color: 0x14141c, roughness: 0.88, metalness: 0.1 })
+                new THREE.PlaneGeometry(5, 5),
+                new THREE.MeshStandardMaterial({ color: 0x181824, roughness: 0.85, metalness: 0.1 })
             );
             floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.position.y = 0;
             floorMesh.receiveShadow = true;
             scene.add(floorMesh);
+
+            // Container Wrapper to safely handle orientation & offset
+            modelWrapper = new THREE.Group();
+            scene.add(modelWrapper);
 
             colladaLoader = new THREE.ColladaLoader();
             gltfLoader = new THREE.GLTFLoader();
@@ -314,24 +320,25 @@
             keyLight.shadow.mapSize.width = 1024;
             keyLight.shadow.mapSize.height = 1024;
             keyLight.shadow.bias = -0.0005;
+            keyLight.position.set(2.5, 3.5, 2.5);
             scene.add(keyLight);
 
             fillLight = new THREE.DirectionalLight(0x8eb3ff, 0.7);
+            fillLight.position.set(-2.5, 2.0, -1.5);
             scene.add(fillLight);
 
-            rimLight = new THREE.DirectionalLight(0xffffff, 2.5);
+            rimLight = new THREE.DirectionalLight(0xffffff, 2.2);
+            rimLight.position.set(0, 3.0, -2.5);
             scene.add(rimLight);
-
-            updateLights();
         }
 
         function updateLights() {
             const angle = THREE.MathUtils.degToRad(parseFloat(document.getElementById('key-angle').value));
-            const dist = 4.0;
-            keyLight.position.set(Math.cos(angle) * dist, 3.0, Math.sin(angle) * dist);
+            const dist = 3.5;
+            keyLight.position.set(Math.cos(angle) * dist, 3.2, Math.sin(angle) * dist);
             keyLight.intensity = parseFloat(document.getElementById('key-intensity').value);
-            fillLight.position.set(-Math.cos(angle) * dist, 1.8, -Math.sin(angle) * dist);
-            rimLight.position.set(0, 2.8, -3.2);
+            fillLight.position.set(-Math.cos(angle) * dist, 2.0, -Math.sin(angle) * dist);
+            rimLight.position.set(0, 3.0, -2.5);
             rimLight.intensity = parseFloat(document.getElementById('rim-intensity').value);
         }
 
@@ -403,8 +410,6 @@
                 const buffer = await file.arrayBuffer();
                 gltfLoader.parse(buffer, '', (gltf) => {
                     loadRealHumanModel(gltf.scene, file.name);
-                }, (err) => {
-                    alert("GLTF Parse Error: " + err.message);
                 });
             }
         }
@@ -451,8 +456,6 @@
                 const buffer = await entry.async("arraybuffer");
                 gltfLoader.parse(buffer, '', (gltf) => {
                     loadRealHumanModel(gltf.scene, name);
-                }, (err) => {
-                    alert("GLTF Parse Error: " + err.message);
                 });
             }
         }
@@ -528,14 +531,14 @@
 
         function parseAndLoadDae(daeText, filename) {
             try {
+                // Remove textures & broken tags that halt Three.js
                 let clean = daeText.replace(/<init_from>[\s\S]*?<\/init_from>/gi, '<init_from></init_from>');
                 clean = clean.replace(/<transparent[\s\S]*?<\/transparent>/gi, '');
 
                 const collada = colladaLoader.parse(clean, '');
                 const targetScene = collada.scene || (collada.scenes && collada.scenes[0]);
-                if (!targetScene) {
-                    throw new Error("Invalid Collada hierarchy");
-                }
+                if (!targetScene) throw new Error("Invalid Collada hierarchy");
+
                 loadRealHumanModel(targetScene, filename);
             } catch (err) {
                 alert("DAE Parse Error: " + err.message);
@@ -544,7 +547,11 @@
         }
 
         function loadRealHumanModel(model, filename) {
-            if (characterModel) scene.remove(characterModel);
+            // Remove previous model from wrapper
+            while (modelWrapper.children.length > 0) {
+                modelWrapper.remove(modelWrapper.children[0]);
+            }
+
             characterModel = model;
             bones = {};
             initialRotations = {};
@@ -563,6 +570,12 @@
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+
+                    // Compute original geometry bounds
+                    if (child.geometry) {
+                        child.geometry.computeBoundingBox();
+                        child.geometry.computeVertexNormals();
+                    }
 
                     const isSkinned = Boolean(child.isSkinnedMesh);
                     const mat = createArtistMaterial(activeShading, isSkinned);
@@ -598,66 +611,61 @@
                 currentDeltas[bName] = { x: 0, y: 0, z: 0 };
             });
 
-            scene.add(characterModel);
-            autoFrameModel(characterModel);
+            modelWrapper.add(characterModel);
+
+            // NORMALIZE MODEL SCALE & ALIGN TO GROUND (Standard Height: 1.75m)
+            normalizeAndCenterModel(characterModel);
 
             document.getElementById('rig-status-box').innerHTML = `<span style="color:#4ade80;">● Active:</span> <b>${filename}</b> (${Object.keys(bones).length} Bones)`;
             updateToast("Active: " + filename);
         }
 
-        function autoFrameModel(model) {
+        // Automatic Height Scaler & Positioning (Decimeter/Meter agnostic)
+        function normalizeAndCenterModel(model) {
             if (!model) return;
 
             model.updateMatrixWorld(true);
+            const rawBox = new THREE.Box3().setFromObject(model);
 
-            const box = new THREE.Box3().setFromObject(model);
-            if (box.isEmpty()) return;
+            if (rawBox.isEmpty()) return;
 
-            const center = box.getCenter(new THREE.Vector3());
+            const size = rawBox.getSize(new THREE.Vector3());
+            const center = rawBox.getCenter(new THREE.Vector3());
 
-            model.position.x -= center.x;
-            model.position.z -= center.z;
-            model.position.y -= box.min.y;
+            // Target height = 1.75 Three.js units (Meters)
+            const targetHeight = 1.75;
+            const currentHeight = size.y > 0 ? size.y : 1;
+            const scaleFactor = targetHeight / currentHeight;
+
+            model.scale.set(scaleFactor, scaleFactor, scaleFactor);
             model.updateMatrixWorld(true);
 
-            const finalBox = new THREE.Box3().setFromObject(model);
-            const finalSize = finalBox.getSize(new THREE.Vector3());
-            const finalCenter = finalBox.getCenter(new THREE.Vector3());
-            const maxDim = Math.max(finalSize.x, finalSize.y, finalSize.z);
+            // Recalculate aligned box
+            const scaledBox = new THREE.Box3().setFromObject(model);
+            const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
 
-            floorMesh.position.set(0, 0, 0);
-            floorMesh.scale.set(Math.max(maxDim * 3, 10), Math.max(maxDim * 3, 10), 1);
+            // Center horizontally, set feet to Y = 0
+            model.position.x = -scaledCenter.x;
+            model.position.z = -scaledCenter.z;
+            model.position.y = -scaledBox.min.y;
 
-            const fov = camera.fov * (Math.PI / 180);
-            const cameraDist = (maxDim / 2) / Math.tan(fov / 2) * 1.5;
-
-            camera.near = Math.max(maxDim / 100, 0.05);
-            camera.far = Math.max(maxDim * 60, 500);
-            camera.updateProjectionMatrix();
-
-            camera.position.set(0, finalCenter.y + (maxDim * 0.1), cameraDist);
-            controls.target.copy(finalCenter);
-            camera.lookAt(finalCenter);
+            // Camera focus at human eye level (~1.3m), orbit center at 0.9m
+            camera.position.set(0, 1.25, 2.6);
+            controls.target.set(0, 0.9, 0);
+            camera.lookAt(0, 0.9, 0);
             controls.update();
-
-            const lightDist = Math.max(maxDim * 2.0, 4);
-            keyLight.position.set(lightDist * 0.8, lightDist * 1.2, lightDist);
-            fillLight.position.set(-lightDist * 0.8, lightDist * 0.6, -lightDist * 0.5);
-            rimLight.position.set(0, lightDist * 1.1, -lightDist);
         }
 
         function focusCameraOnModel() {
-            if (characterModel) autoFrameModel(characterModel);
+            if (characterModel) normalizeAndCenterModel(characterModel);
         }
 
         function createArtistMaterial(mode, isSkinned) {
             const params = {
                 skinning: isSkinned,
                 side: THREE.DoubleSide,
-                transparent: false,
-                opacity: 1.0,
-                roughness: 0.82,
-                metalness: 0.08
+                roughness: 0.85,
+                metalness: 0.05
             };
 
             if (mode === 'clay') {
