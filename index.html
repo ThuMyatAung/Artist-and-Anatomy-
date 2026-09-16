@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Anatomy Studio</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { background: #0c0c10; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        #ui-toggle-btn {
+            position: absolute; top: 14px; right: 14px; z-index: 50;
+            background: rgba(28, 28, 38, 0.9); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2); color: #fff;
+            padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        #ui-panel {
+            position: absolute; top: 14px; left: 14px; width: 340px; max-height: 92vh;
+            background: rgba(18, 18, 24, 0.88); backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px;
+            padding: 14px; overflow-y: auto; z-index: 20; box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+        }
+        #ui-panel.hidden { transform: translateX(-120%); opacity: 0; pointer-events: none; }
+
+        @media (max-width: 768px) {
+            #ui-panel {
+                top: auto; bottom: 0; left: 0; width: 100%; max-height: 52vh;
+                border-radius: 18px 18px 0 0; border-bottom: none;
+            }
+            #ui-panel.hidden { transform: translateY(110%); }
+        }
+
+        h2 { font-size: 14px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: space-between; }
+        .status-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 500; background: #064e3b; color: #6ee7b7; }
+
+        .tabs { display: flex; gap: 4px; margin: 10px 0; background: #14141c; padding: 3px; border-radius: 8px; }
+        .tab { flex: 1; text-align: center; padding: 6px 0; font-size: 11px; border-radius: 6px; cursor: pointer; color: #8a8a9a; }
+        .tab.active { background: #262638; color: #fff; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin: 12px 0 6px; border-bottom: 1px solid #232330; padding-bottom: 3px; }
+        .control-group { margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        
+        label { font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; }
+        select, input[type="range"], button {
+            background: #1b1b26; color: #f8fafc; border: 1px solid #333346;
+            border-radius: 6px; padding: 6px 8px; font-size: 12px; outline: none;
+        }
+        input[type="range"] { -webkit-appearance: none; height: 4px; background: #2d2d3f; border-radius: 2px; padding: 0; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #6366f1; cursor: pointer; }
+        button { cursor: pointer; background: #252536; font-weight: 500; }
+        button.primary { background: #4f46e5; border-color: #6366f1; }
+        
+        #rig-status-box {
+            font-size: 11px; padding: 6px 10px; border-radius: 6px;
+            background: #181824; border: 1px solid #2b2b3d; margin-bottom: 8px; color: #4ade80;
+        }
+
+        #status-toast {
+            position: absolute; bottom: 15px; right: 15px;
+            background: rgba(20, 20, 28, 0.92); border: 1px solid rgba(255,255,255,0.18);
+            padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #cbd5e1;
+            z-index: 100; display: block;
+        }
+    </style>
+    <!-- Three.js + Loaders -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/ColladaLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <button id="ui-toggle-btn" onclick="toggleUI()">👁️ Hide UI</button>
+    <div id="status-toast">Ready</div>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-panel">
+        <h2>
+            Anatomy Studio 3D
+            <span id="zip-badge" class="status-badge">Connecting...</span>
+        </h2>
+
+        <!-- TABS: 1. Model -> 2. Posing -> 3. Lighting -> 4. Data -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('tab-model')">Model</div>
+            <div class="tab" onclick="switchTab('tab-pose')">Posing</div>
+            <div class="tab" onclick="switchTab('tab-light')">Lighting</div>
+            <div class="tab" onclick="switchTab('tab-file')">Data</div>
+        </div>
+
+        <!-- TAB 1: MODEL SELECTION -->
+        <div id="tab-model" class="tab-content active">
+            <div class="section-title">Anatomy Subject</div>
+            <div class="control-group">
+                <label>Ethnic Archetype (လူမျိုး):</label>
+                <select id="sel-ethnic" onchange="onModelConfigChange()">
+                    <option value="asian" selected>Asian (အာရှ)</option>
+                    <option value="caucasian">Caucasian (အနောက်တိုင်း)</option>
+                    <option value="african">African (အာဖရိက)</option>
+                </select>
+            </div>
+            <div class="grid-2">
+                <div class="control-group">
+                    <label>Gender (ကျား/မ):</label>
+                    <select id="sel-gender" onchange="onModelConfigChange()">
+                        <option value="male" selected>Male</option>
+                        <option value="female">Female</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Age (အသက်အရွယ်):</label>
+                    <select id="sel-age" onchange="onModelConfigChange()">
+                        <option value="adult" selected>Adult (~30)</option>
+                        <option value="teen">Teen (13-16)</option>
+                        <option value="child">Child (5-7)</option>
+                        <option value="toddler">Toddler (1-2)</option>
+                        <option value="elderly">Elderly (~70)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Direct File Selector from ZIP -->
+            <div class="control-group" id="zip-direct-group" style="margin-top: 6px;">
+                <label>Direct Model Select (ဖိုင်တိုက်ရိုက်ရွေးရန်):</label>
+                <select id="sel-zip-file" onchange="loadSpecificZipFile(this.value)"></select>
+            </div>
+
+            <div class="section-title">Shading Mode (အလင်းအမှောင်)</div>
+            <div class="control-group">
+                <select id="sel-shading" onchange="applyShadingMode(this.value)">
+                    <option value="clay" selected>Smooth Clay (ပလာစတာစတိုင်)</option>
+                    <option value="planar">Planar / Asaro (Planes of Light)</option>
+                    <option value="ecorche">Ecorché (ကြွက်သားလွှာစတိုင်)</option>
+                    <option value="wireframe">Wireframe</option>
+                </select>
+            </div>
+
+            <button onclick="focusCameraOnModel()" style="margin-top: 8px; width: 100%;">🎯 Center & Focus View</button>
+        </div>
+
+        <!-- TAB 2: POSING & MOVEMENTS -->
+        <div id="tab-pose" class="tab-content">
+            <div id="rig-status-box">● Model Active</div>
+
+            <div class="section-title">Everyday Movement Presets</div>
+            <div class="control-group">
+                <select id="sel-pose" onchange="applyPresetPose(this.value)">
+                    <option value="neutral">Neutral A-Pose (မူလ မတ်တပ်)</option>
+                    <option value="contrapposto" selected>Contrapposto (ဂန္ထဝင် အလေးပေးရပ်ဟန်)</option>
+                    <option value="sitting">Sitting (ကုလားထိုင် ထိုင်ဟန်)</option>
+                    <option value="walking">Walking / Stride (လမ်းလျှောက်ဟန်)</option>
+                    <option value="folded_arms">Folded Arms (လက်ပိုက်ရပ်ဟန်)</option>
+                    <option value="thinker">The Thinker (စဉ်းစားတွေးတောဟန်)</option>
+                </select>
+            </div>
+
+            <div class="section-title">Fine-tune Dynamic Move (အဆစ်လှည့်ရန်)</div>
+            <div class="control-group">
+                <label>Select Joint (လှုပ်မည့်နေရာ):</label>
+                <select id="sel-bone" onchange="loadBoneRotations()"></select>
+            </div>
+            <div class="control-group">
+                <label>Rotate X (ရှေ့/နောက် ကွေး): <span id="val-rx">0°</span></label>
+                <input type="range" id="rot-x" min="-90" max="90" value="0" oninput="updateBoneRotation()">
+            </div>
+            <div class="control-group">
+                <label>Rotate Y (ဘယ်/ညာ လှည့်): <span id="val-ry">0°</span></label>
+                <input type="range" id="rot-y" min="-90" max="90" value="0" oninput="updateBoneRotation()">
+            </div>
+            <div class="control-group">
+                <label>Rotate Z (ဘေးဘက် စောင်း): <span id="val-rz">0°</span></label>
+                <input type="range" id="rot-z" min="-90" max="90" value="0" oninput="updateBoneRotation()">
+            </div>
+            <div class="grid-2" style="margin-top: 6px;">
+                <button onclick="resetCurrentBone()">Reset Selected</button>
+                <button onclick="resetAllBonesToRestPose()">Reset All</button>
+            </div>
+        </div>
+
+        <!-- TAB 3: LIGHTING -->
+        <div id="tab-light" class="tab-content">
+            <div class="section-title">Studio Preset</div>
+            <div class="control-group">
+                <select id="sel-light-preset" onchange="applyLightingPreset(this.value)">
+                    <option value="studio" selected>3-Point Studio (Default)</option>
+                    <option value="daylight">Daylight / Natural Sun</option>
+                    <option value="stage">Stage / Dramatic Rim</option>
+                </select>
+            </div>
+            <div class="section-title">Key Light (အဓိကမီး)</div>
+            <div class="control-group">
+                <label>Orbit Angle:</label>
+                <input type="range" id="key-angle" min="0" max="360" value="45" oninput="updateLights()">
+            </div>
+            <div class="control-group">
+                <label>Intensity:</label>
+                <input type="range" id="key-intensity" min="0" max="3.5" step="0.1" value="1.5" oninput="updateLights()">
+            </div>
+            <div class="section-title">Rim Light (အနားသတ်မီး)</div>
+            <div class="control-group">
+                <label>Intensity:</label>
+                <input type="range" id="rim-intensity" min="0" max="4" step="0.1" value="2.2" oninput="updateLights()">
+            </div>
+            <button class="primary" style="margin-top: 10px; width: 100%;" onclick="resetLights()">Reset Lighting</button>
+        </div>
+
+        <!-- TAB 4: DATA -->
+        <div id="tab-file" class="tab-content">
+            <div class="section-title">ZIP / Direct File Upload</div>
+            <p id="zip-msg" style="font-size: 11px; color: #94a3b8; line-height: 1.4; margin-bottom: 8px;">
+                <code>models.zip</code> သို့မဟုတ် သီးသန့် <code>.dae</code> / <code>.glb</code> ဖိုင်ကို အောက်ပါခလုတ်မှ တင်နိုင်ပါသည်-
+            </p>
+            <input type="file" id="zip-input" accept=".zip,.dae,.glb,.gltf" onchange="onFileUpload(event)" style="width: 100%;">
+            <div id="zip-file-list" style="margin-top: 10px; font-size: 10px; color: #64748b; max-height: 120px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script>
+        let isUIHidden = false;
+        function toggleUI() {
+            isUIHidden = !isUIHidden;
+            const panel = document.getElementById('ui-panel');
+            const btn = document.getElementById('ui-toggle-btn');
+            panel.classList.toggle('hidden', isUIHidden);
+            btn.innerText = isUIHidden ? "⚙️ Show UI" : "👁️ Hide UI";
+        }
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(id).classList.add('active');
+        }
+
+        function updateToast(txt) {
+            document.getElementById('status-toast').innerText = txt;
+        }
+
+        const MAJOR_BONES = [
+            { key: 'head', label: 'Head (ဦးခေါင်း)' },
+            { key: 'neck01', label: 'Neck (လည်ပင်း)' },
+            { key: 'spine03', label: 'Chest (ရင်အုပ်)' },
+            { key: 'spine01', label: 'Waist (ခါး)' },
+            { key: 'root', label: 'Pelvis (တင်ပါးဆုံ)' },
+            { key: 'upperarm01_L', label: 'Left Upper Arm (ဘယ်လက်မောင်း)' },
+            { key: 'lowerarm01_L', label: 'Left Forearm (ဘယ်လက်ဖျံ)' },
+            { key: 'upperarm01_R', label: 'Right Upper Arm (ညာလက်မောင်း)' },
+            { key: 'lowerarm01_R', label: 'Right Forearm (ညာလက်ဖျံ)' },
+            { key: 'upperleg01_L', label: 'Left Thigh (ဘယ်ပေါင်)' },
+            { key: 'lowerleg01_L', label: 'Left Knee (ဘယ်ဒူးခေါင်း)' },
+            { key: 'upperleg01_R', label: 'Right Thigh (ညာပေါင်)' },
+            { key: 'lowerleg01_R', label: 'Right Knee (ညာဒူးခေါင်း)' }
+        ];
+
+        let scene, camera, renderer, controls, floorMesh;
+        let characterModel = null, bones = {}, initialRotations = {}, currentDeltas = {};
+        let keyLight, fillLight, rimLight, ambientLight;
+        let loadedZip = null, colladaLoader, gltfLoader;
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0e0e13);
+
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.2, 3.2);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0.9, 0);
+            controls.enableDamping = true;
+
+            floorMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(10, 10),
+                new THREE.MeshStandardMaterial({ color: 0x14141c, roughness: 0.88 })
+            );
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.receiveShadow = true;
+            scene.add(floorMesh);
+
+            colladaLoader = new THREE.ColladaLoader();
+            gltfLoader = new THREE.GLTFLoader();
+
+            setupLights();
+            populateBoneDropdown();
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+
+            setTimeout(tryAutoLoadZip, 200);
+        }
+
+        function setupLights() {
+            ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+            scene.add(ambientLight);
+
+            keyLight = new THREE.DirectionalLight(0xfff3e3, 1.8);
+            keyLight.castShadow = true;
+            keyLight.shadow.mapSize.width = 1024;
+            keyLight.shadow.mapSize.height = 1024;
+            scene.add(keyLight);
+
+            fillLight = new THREE.DirectionalLight(0x8eb3ff, 0.6);
+            scene.add(fillLight);
+
+            rimLight = new THREE.DirectionalLight(0xffffff, 2.5);
+            scene.add(rimLight);
+
+            updateLights();
+        }
+
+        function updateLights() {
+            const angle = THREE.MathUtils.degToRad(parseFloat(document.getElementById('key-angle').value));
+            const dist = 4.0;
+            keyLight.position.set(Math.cos(angle) * dist, 3.0, Math.sin(angle) * dist);
+            keyLight.intensity = parseFloat(document.getElementById('key-intensity').value);
+            fillLight.position.set(-Math.cos(angle) * dist, 1.8, -Math.sin(angle) * dist);
+            rimLight.position.set(0, 2.8, -3.2);
+            rimLight.intensity = parseFloat(document.getElementById('rim-intensity').value);
+        }
+
+        function resetLights() {
+            document.getElementById('key-angle').value = 45;
+            document.getElementById('key-intensity').value = 1.5;
+            document.getElementById('rim-intensity').value = 2.2;
+            updateLights();
+        }
+
+        function applyLightingPreset(type) {
+            if (type === 'studio') resetLights();
+            else if (type === 'daylight') {
+                keyLight.position.set(2, 4, 2); keyLight.intensity = 2.2; rimLight.intensity = 0.4;
+            } else if (type === 'stage') {
+                keyLight.intensity = 0.4; rimLight.intensity = 4.0;
+            }
+        }
+
+        // AUTO-LOAD MODELS.ZIP
+        async function tryAutoLoadZip() {
+            updateToast("Connecting to models.zip...");
+            const candidates = ['models.zip', './models.zip', 'Models.zip', './Models.zip'];
+            let foundBlob = null;
+
+            for (const url of candidates) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) { foundBlob = await res.blob(); break; }
+                } catch (e) {}
+            }
+
+            if (foundBlob) {
+                try {
+                    loadedZip = await JSZip.loadAsync(foundBlob);
+                    setZipBadge(true, "models.zip Active");
+                    displayZipContents();
+                    await onModelConfigChange();
+                } catch (e) {
+                    setZipBadge(false, "ZIP Error");
+                    updateToast("models.zip ဖတ်မရပါ");
+                }
+            } else {
+                setZipBadge(false, "models.zip Not Found");
+                updateToast("Data tab မှ models.zip ကို ရွေးပေးပါ");
+            }
+        }
+
+        async function onFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const name = file.name.toLowerCase();
+            if (name.endsWith('.zip')) {
+                updateToast("Extracting " + file.name + "...");
+                try {
+                    loadedZip = await JSZip.loadAsync(file);
+                    setZipBadge(true, file.name);
+                    displayZipContents();
+                    await onModelConfigChange();
+                } catch (err) {
+                    alert("ZIP ဖတ်မရပါ: " + err.message);
+                }
+            } else if (name.endsWith('.dae')) {
+                updateToast("Rendering " + file.name + "...");
+                const text = await file.text();
+                parseAndLoadDae(text, file.name);
+            } else if (name.endsWith('.glb') || name.endsWith('.gltf')) {
+                updateToast("Rendering " + file.name + "...");
+                const buffer = await file.arrayBuffer();
+                gltfLoader.parse(buffer, '', (gltf) => {
+                    loadRealHumanModel(gltf.scene, file.name);
+                });
+            }
+        }
+
+        function setZipBadge(ok, text) {
+            const badge = document.getElementById('zip-badge');
+            badge.innerText = text;
+            badge.className = "status-badge " + (ok ? "ok" : "");
+        }
+
+        function displayZipContents() {
+            if (!loadedZip) return;
+            const select = document.getElementById('sel-zip-file');
+            select.innerHTML = '';
+            const files = Object.keys(loadedZip.files).filter(k => !loadedZip.files[k].dir && !k.includes('__MACOSX') && (k.endsWith('.dae') || k.endsWith('.glb')));
+            files.sort().forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.innerText = f.split('/').pop();
+                select.appendChild(opt);
+            });
+        }
+
+        async function loadSpecificZipFile(path) {
+            if (!loadedZip || !loadedZip.files[path]) return;
+            const entry = loadedZip.files[path];
+            const name = path.split('/').pop();
+            updateToast("Rendering " + name + "...");
+
+            if (name.toLowerCase().endsWith('.dae')) {
+                const text = await entry.async("text");
+                parseAndLoadDae(text, name);
+            } else {
+                const buffer = await entry.async("arraybuffer");
+                gltfLoader.parse(buffer, '', (gltf) => {
+                    loadRealHumanModel(gltf.scene, name);
+                });
+            }
+        }
+
+        // 100% STRICT ETHNICITY POOL MATCHER (NEVER LEAPS TO CAUCASIAN ON ASIAN SELECTION)
+        function findEntryInZip(zip, ethnic, gender, age) {
+            const e = ethnic.toLowerCase().trim();
+            const g = gender.toLowerCase().trim();
+            const a = age.toLowerCase().trim();
+
+            const allFiles = Object.keys(zip.files).filter(k => {
+                if (zip.files[k].dir || k.includes('__MACOSX')) return false;
+                const low = k.toLowerCase();
+                return low.endsWith('.dae') || low.endsWith('.glb');
+            });
+
+            // Isolate current ethnicity pool strictly
+            const pool = allFiles.filter(k => {
+                const low = k.toLowerCase();
+                if (e === 'asian') return low.includes('asian');
+                if (e === 'african') return low.includes('african');
+                if (e === 'caucasian') return low.includes('caucasian') || low.includes('caucasia');
+                return false;
+            });
+
+            const targetPool = (pool.length > 0) ? pool : allFiles;
+
+            // Match gender within target pool
+            let genderPool = targetPool.filter(k => {
+                const low = k.toLowerCase();
+                if (g === 'female') return low.includes('female');
+                if (g === 'male') return low.includes('male') && !low.includes('female');
+                return true;
+            });
+            if (genderPool.length === 0) genderPool = targetPool;
+
+            // Match age within gender pool
+            const ageMatch = genderPool.find(k => k.toLowerCase().includes(a));
+            if (ageMatch) return ageMatch;
+
+            return genderPool[0];
+        }
+
+        async function onModelConfigChange() {
+            if (!loadedZip) return;
+            const ethnic = document.getElementById('sel-ethnic').value;
+            const gender = document.getElementById('sel-gender').value;
+            const age = document.getElementById('sel-age').value;
+
+            const matchedPath = findEntryInZip(loadedZip, ethnic, gender, age);
+            if (!matchedPath) {
+                updateToast("မော်ဒယ်ဖိုင် ရှာမတွေ့ပါ");
+                return;
+            }
+
+            document.getElementById('sel-zip-file').value = matchedPath;
+            await loadSpecificZipFile(matchedPath);
+        }
+
+        // 100% BULLETPROOF COLLADA XML SANITIZER: ELIMINATES OPACITY=0 AND 404 NETWORK LOOPS
+        function parseAndLoadDae(daeText, filename) {
+            try {
+                // 1. Replace textures with standard diffuse color so ColladaLoader never fetches missing PNGs
+                let clean = daeText.replace(/<diffuse>\s*<texture\b[^>]*\/>\s*<\/diffuse>/gi, '<diffuse><color>0.84 0.76 0.68 1.0</color></diffuse>');
+                // 2. Eliminate <transparent> tags completely so ColladaLoader never sets opacity to 0!
+                clean = clean.replace(/<transparent>[\s\S]*?<\/transparent>/gi, '');
+                // 3. Clear library_images
+                clean = clean.replace(/<library_images[\s\S]*?<\/library_images>/gi, '<library_images/>');
+
+                const collada = colladaLoader.parse(clean, '');
+                loadRealHumanModel(collada.scene, filename);
+            } catch (err) {
+                alert("DAE Parse Error: " + err.message);
+                updateToast("DAE Error: " + err.message);
+            }
+        }
+
+        // FULL OPACITY SKINNED MESH & BONE TEXTURE ATTACHMENT
+        function loadRealHumanModel(model, filename) {
+            if (characterModel) scene.remove(characterModel);
+            characterModel = model;
+            bones = {};
+            initialRotations = {};
+            currentDeltas = {};
+
+            characterModel.traverse((child) => {
+                child.visible = true;
+                child.frustumCulled = false;
+
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+
+                    // Compute Bone Texture for 163 bones on Mobile Safari
+                    if (child.isSkinnedMesh && child.skeleton) {
+                        child.skeleton.computeBoneTexture();
+                        if (child.skeleton.boneTexture) {
+                            child.skeleton.boneTexture.needsUpdate = true;
+                        }
+                    }
+
+                    // Assign 100% Opaque Plaster Material
+                    const isSkinned = Boolean(child.isSkinnedMesh);
+                    const mat = createArtistMaterial(document.getElementById('sel-shading').value, isSkinned);
+                    if (Array.isArray(child.material)) child.material = child.material.map(() => mat.clone());
+                    else child.material = mat;
+
+                    if (child.isSkinnedMesh && child.skeleton && child.skeleton.bones) {
+                        child.skeleton.bones.forEach(b => {
+                            if (b && b.name) {
+                                b.matrixAutoUpdate = true;
+                                if (!b.userData.restQuat) b.userData.restQuat = b.quaternion.clone();
+                                bones[b.name] = b;
+                            }
+                        });
+                    }
+                }
+                if (child.isBone || child.type === 'Bone') {
+                    if (child.name) {
+                        child.matrixAutoUpdate = true;
+                        if (!child.userData.restQuat) child.userData.restQuat = child.quaternion.clone();
+                        bones[child.name] = child;
+                    }
+                }
+            });
+
+            // Cache Initial Bone Rotations
+            Object.keys(bones).forEach(bName => {
+                const b = bones[bName];
+                b.updateMatrix();
+                initialRotations[bName] = { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z };
+                currentDeltas[bName] = { x: 0, y: 0, z: 0 };
+            });
+
+            scene.add(characterModel);
+
+            // Normalize Scale & Position
+            characterModel.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(characterModel);
+            const size = box.getSize(new THREE.Vector3());
+
+            if (size.y > 0) {
+                const targetHeight = 1.75;
+                const scale = targetHeight / size.y;
+                characterModel.scale.set(scale, scale, scale);
+            }
+            characterModel.updateMatrixWorld(true);
+
+            // Center Feet on Ground at Y=0
+            const scaledBox = new THREE.Box3().setFromObject(characterModel);
+            const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+
+            characterModel.position.x = -scaledCenter.x;
+            characterModel.position.z = -scaledCenter.z;
+            characterModel.position.y = -scaledBox.min.y;
+            characterModel.updateMatrixWorld(true);
+
+            // Ground plane stays flat under feet at Y=0
+            floorMesh.position.set(0, 0, 0);
+
+            // Camera Focus
+            focusCameraOnModel();
+
+            document.getElementById('rig-status-box').innerHTML = `<span style="color:#4ade80;">● Active:</span> <b>${filename}</b> (${Object.keys(bones).length} Bones)`;
+            updateToast("Active: " + filename);
+        }
+
+        function focusCameraOnModel() {
+            camera.position.set(0, 1.2, 3.2);
+            controls.target.set(0, 0.9, 0);
+            camera.lookAt(0, 0.9, 0);
+            controls.update();
+        }
+
+        // PURE OPAQUE PLASTER SCULPTURE MATERIALS (LIGHTWEIGHT & SAFE)
+        function createArtistMaterial(mode, isSkinned) {
+            const params = {
+                skinning: isSkinned,
+                side: THREE.DoubleSide,
+                transparent: false,
+                opacity: 1.0
+            };
+            if (mode === 'clay') {
+                return new THREE.MeshLambertMaterial({ ...params, color: 0xd6cbb8 });
+            } else if (mode === 'planar') {
+                return new THREE.MeshLambertMaterial({ ...params, color: 0xd2d2dc, flatShading: true });
+            } else if (mode === 'ecorche') {
+                return new THREE.MeshLambertMaterial({ ...params, color: 0x983232 });
+            } else if (mode === 'wireframe') {
+                return new THREE.MeshBasicMaterial({ ...params, color: 0x6366f1, wireframe: true });
+            }
+            return null;
+        }
+
+        function applyShadingMode(mode) {
+            if (!characterModel) return;
+            characterModel.traverse((child) => {
+                if (child.isMesh) {
+                    const isSkinned = Boolean(child.isSkinnedMesh);
+                    const mat = createArtistMaterial(mode, isSkinned);
+                    if (Array.isArray(child.material)) child.material = child.material.map(() => mat.clone());
+                    else child.material = mat;
+                }
+            });
+        }
+
+        // BONE ROTATION ENGINE (RELATIVE QUATERNIONS)
+        function resolveBoneName(key) {
+            if (bones[key]) return key;
+            const lower = key.toLowerCase();
+            return Object.keys(bones).find(b => b.toLowerCase() === lower || b.toLowerCase().endsWith('_' + lower) || b.toLowerCase().endsWith(lower));
+        }
+
+        function populateBoneDropdown() {
+            const select = document.getElementById('sel-bone');
+            select.innerHTML = '';
+            MAJOR_BONES.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.key;
+                opt.innerText = item.label;
+                select.appendChild(opt);
+            });
+            loadBoneRotations();
+        }
+
+        function loadBoneRotations() {
+            const key = document.getElementById('sel-bone').value;
+            const actualName = resolveBoneName(key);
+            const delta = (actualName && currentDeltas[actualName]) ? currentDeltas[actualName] : { x: 0, y: 0, z: 0 };
+            document.getElementById('rot-x').value = delta.x;
+            document.getElementById('rot-y').value = delta.y;
+            document.getElementById('rot-z').value = delta.z;
+            document.getElementById('val-rx').innerText = delta.x + '°';
+            document.getElementById('val-ry').innerText = delta.y + '°';
+            document.getElementById('val-rz').innerText = delta.z + '°';
+        }
+
+        function updateBoneRotation() {
+            const key = document.getElementById('sel-bone').value;
+            const actualName = resolveBoneName(key);
+            if (!actualName || !bones[actualName]) return;
+
+            const dx = parseFloat(document.getElementById('rot-x').value);
+            const dy = parseFloat(document.getElementById('rot-y').value);
+            const dz = parseFloat(document.getElementById('rot-z').value);
+
+            applyRotationToBone(actualName, dx, dy, dz);
+
+            document.getElementById('val-rx').innerText = dx + '°';
+            document.getElementById('val-ry').innerText = dy + '°';
+            document.getElementById('val-rz').innerText = dz + '°';
+        }
+
+        function applyRotationToBone(boneName, dx, dy, dz) {
+            const b = bones[boneName];
+            if (!b || !b.userData.restQuat) return;
+
+            currentDeltas[boneName] = { x: dx, y: dy, z: dz };
+
+            const deltaEuler = new THREE.Euler(
+                THREE.MathUtils.degToRad(dx),
+                THREE.MathUtils.degToRad(dy),
+                THREE.MathUtils.degToRad(dz),
+                'XYZ'
+            );
+            const deltaQuat = new THREE.Quaternion().setFromEuler(deltaEuler);
+
+            b.quaternion.copy(b.userData.restQuat).multiply(deltaQuat);
+            b.updateMatrix();
+
+            characterModel.traverse((child) => {
+                if (child.isSkinnedMesh && child.skeleton) {
+                    child.skeleton.update();
+                }
+            });
+        }
+
+        function resetCurrentBone() {
+            const key = document.getElementById('sel-bone').value;
+            const actualName = resolveBoneName(key);
+            document.getElementById('rot-x').value = 0;
+            document.getElementById('rot-y').value = 0;
+            document.getElementById('rot-z').value = 0;
+            if (actualName) applyRotationToBone(actualName, 0, 0, 0);
+            loadBoneRotations();
+        }
+
+        function resetAllBonesToRestPose() {
+            Object.keys(bones).forEach(bName => {
+                const b = bones[bName];
+                if (b && b.userData.restQuat) {
+                    b.quaternion.copy(b.userData.restQuat);
+                    b.updateMatrix();
+                    currentDeltas[bName] = { x: 0, y: 0, z: 0 };
+                }
+            });
+            if (characterModel) {
+                characterModel.traverse((child) => {
+                    if (child.isSkinnedMesh && child.skeleton) child.skeleton.update();
+                });
+            }
+            loadBoneRotations();
+        }
+
+        // PRESET MOVEMENTS
+        function applyPresetPose(pose) {
+            resetAllBonesToRestPose();
+
+            const applyDelta = (key, dx, dy, dz) => {
+                const name = resolveBoneName(key);
+                if (name) applyRotationToBone(name, dx, dy, dz);
+            };
+
+            if (pose === 'contrapposto') {
+                applyDelta('root', 0, 0, 4);
+                applyDelta('spine01', -2, 3, -5);
+                applyDelta('spine03', 2, -2, 2);
+                applyDelta('head', 3, -10, 3);
+                applyDelta('upperleg01_R', -3, 0, 2);
+                applyDelta('upperleg01_L', 14, -5, -5);
+                applyDelta('lowerleg01_L', -18, 0, 0);
+                applyDelta('upperarm01_R', 10, 0, 10);
+                applyDelta('lowerarm01_R', 0, 0, 20);
+                applyDelta('upperarm01_L', 5, 0, -8);
+            } else if (pose === 'sitting') {
+                applyDelta('upperleg01_L', -75, 4, 0);
+                applyDelta('upperleg01_R', -75, -4, 0);
+                applyDelta('lowerleg01_L', 80, 0, 0);
+                applyDelta('lowerleg01_R', 80, 0, 0);
+                applyDelta('spine01', 5, 0, 0);
+                applyDelta('lowerarm01_L', -20, 0, 0);
+                applyDelta('lowerarm01_R', -20, 0, 0);
+            } else if (pose === 'walking') {
+                applyDelta('upperleg01_R', -25, 3, 0);
+                applyDelta('lowerleg01_R', 30, 0, 0);
+                applyDelta('upperleg01_L', 18, -3, 0);
+                applyDelta('lowerleg01_L', -10, 0, 0);
+                applyDelta('upperarm01_L', -25, 6, 10);
+                applyDelta('lowerarm01_L', -15, 0, 0);
+                applyDelta('upperarm01_R', 20, -3, -10);
+                applyDelta('spine01', 2, -10, 0);
+            } else if (pose === 'folded_arms') {
+                applyDelta('upperarm01_L', 15, 25, 15);
+                applyDelta('lowerarm01_L', -65, 15, 20);
+                applyDelta('upperarm01_R', 15, -25, -15);
+                applyDelta('lowerarm01_R', -65, -15, -20);
+            } else if (pose === 'thinker') {
+                applyDelta('spine01', 12, -6, 0);
+                applyDelta('head', -10, 14, -3);
+                applyDelta('upperarm01_R', -35, 6, 18);
+                applyDelta('lowerarm01_R', -80, 20, 0);
+            }
+
+            loadBoneRotations();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
