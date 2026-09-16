@@ -215,9 +215,9 @@
         <div id="tab-file" class="tab-content">
             <div class="section-title">ZIP / Direct File Upload</div>
             <p id="zip-msg" style="font-size: 11px; color: #94a3b8; line-height: 1.4; margin-bottom: 8px;">
-                <code>models.zip</code> သို့မဟုတ် သီးသန့် <code>.dae</code> / <code>.glb</code> ဖိုင်ကို ရွေးချယ်တင်သွင်းနိုင်ပါသည်-
+                <code>models.zip</code> သို့မဟုတ် <code>.dae</code> / <code>.glb</code> / <code>.gltf</code> နှင့် လိုအပ်သော texture / <code>.bin</code> ဖိုင်များကို ရွေးချယ်တင်သွင်းနိုင်ပါသည်-
             </p>
-            <input type="file" id="zip-input" accept=".zip,.dae,.glb,.gltf" onchange="onFileUpload(event)" style="width: 100%;">
+            <input type="file" id="zip-input" accept=".zip,.dae,.glb,.gltf,.bin,.png,.jpg,.jpeg,.webp,.ktx2" multiple onchange="onFileUpload(event)" style="width: 100%;">
             <div id="zip-file-list" style="margin-top: 10px; font-size: 10px; color: #64748b; max-height: 120px; overflow-y: auto;"></div>
         </div>
     </div>
@@ -263,19 +263,267 @@
         let scene, camera, renderer, controls, floorMesh, modelWrapper;
         let characterModel = null, bones = {}, initialRotations = {}, currentDeltas = {};
         let keyLight, fillLight, rimLight, ambientLight;
-        let loadedZip = null, colladaLoader, gltfLoader;
+
+        // Asset/loading state
+        let loadedZip = null;
+        let colladaLoader = null;
+        let gltfLoader = null;
+        let loadingManager = null;
+        let activeObjectURLs = [];
+        let uploadedFiles = new Map(); // normalized path/name -> File
+        let currentAssetPath = '';
+        let lastLoadedModelName = '';
+
+        function normalizeAssetPath(path) {
+            if (!path) return '';
+            try {
+                path = decodeURIComponent(String(path));
+            } catch (_) {}
+            path = path.replace(/\\/g, '/');
+            path = path.replace(/^(\.\/)+/, '');
+            const parts = [];
+            for (const part of path.split('/')) {
+                if (!part || part === '.') continue;
+                if (part === '..') {
+                    if (parts.length) parts.pop();
+                } else {
+                    parts.push(part);
+                }
+            }
+            return parts.join('/');
+        }
+
+        function basename(path) {
+            const p = normalizeAssetPath(path);
+            return p.substring(p.lastIndexOf('/') + 1);
+        }
+
+        function dirname(path) {
+            const p = normalizeAssetPath(path);
+            const i = p.lastIndexOf('/');
+            return i >= 0 ? p.substring(0, i + 1) : '';
+        }
+
+        function stripQueryHash(path) {
+            return String(path || '').split('#')[0].split('?')[0];
+        }
+
+        function makeBlobURL(blob) {
+            const url = URL.createObjectURL(blob);
+            activeObjectURLs.push(url);
+            return url;
+        }
+
+        function revokeActiveObjectURLs() {
+            for (const url of activeObjectURLs) {
+                try { URL.revokeObjectURL(url); } catch (_) {}
+            }
+            activeObjectURLs = [];
+        }
+
+        function showLoaderError(context, err) {
+            const msg = err?.message || String(err || 'Unknown error');
+            console.error(context, err);
+            updateToast(context + ': ' + msg);
+            setZipBadge(false, 'Load Error');
+        }
+
+        function findZipEntry(resourceURL) {
+            if (!loadedZip) return null;
+
+            const raw = stripQueryHash(resourceURL);
+            const norm = normalizeAssetPath(raw);
+
+            // Exact match first.
+            if (loadedZip.files[norm] && !loadedZip.files[norm].dir) {
+                return { path: norm, entry: loadedZip.files[norm] };
+            }
+
+            // Some loaders may pass the URL with ./ or an absolute-ish base.
+            const exactCandidates = [
+                raw,
+                raw.replace(/^\.\/+/, ''),
+                norm.replace(/^\/+/, '')
+            ];
+            for (const c of exactCandidates) {
+                const n = normalizeAssetPath(c);
+                if (loadedZip.files[n] && !loadedZip.files[n].dir) {
+                    return { path: n, entry: loadedZip.files[n] };
+                }
+            }
+
+            // Fallback: filename match only when unique.
+            const base = basename(norm).toLowerCase();
+            const matches = Object.keys(loadedZip.files).filter(k =>
+                !loadedZip.files[k].dir && basename(k).toLowerCase() === base
+            );
+            if (matches.length === 1) {
+                return { path: matches[0], entry: loadedZip.files[matches[0]] };
+            }
+
+            return null;
+        }
+
+        function findUploadedFile(resourceURL) {
+            const raw = stripQueryHash(resourceURL);
+            const norm = normalizeAssetPath(raw);
+
+            const direct = uploadedFiles.get(norm) || uploadedFiles.get(raw);
+            if (direct) return direct;
+
+            const b = basename(norm).toLowerCase();
+            const matches = [...uploadedFiles.entries()]
+                .filter(([k]) => basename(k).toLowerCase() === b);
+
+            return matches.length === 1 ? matches[0][1] : null;
+        }
+
+        function installAssetURLModifier(sourceType, assetPath) {
+            revokeActiveObjectURLs();
+
+            const assetDir = dirname(assetPath);
+            const zipCache = new Map();
+            const fileCache = new Map();
+
+            loadingManager.setURLModifier((url) => {
+                const cleanURL = stripQueryHash(url);
+                const normalized = normalizeAssetPath(cleanURL);
+
+                // Data/blob URLs are already valid.
+                if (/^(data:|blob:|https?:|file:)/i.test(cleanURL)) {
+                    return url;
+                }
+
+                let key = normalized;
+
+                // GLTF/Collada dependencies are relative to the current asset directory.
+                if (assetDir && !normalized.startsWith(assetDir)) {
+                    key = normalizeAssetPath(assetDir + normalized);
+                }
+
+                if (sourceType === 'zip') {
+                    let found = findZipEntry(key) || findZipEntry(normalized);
+                    if (!found) {
+                        // Last resort: try the original path relative to asset directory.
+                        found = findZipEntry(assetDir + basename(normalized));
+                    }
+                    if (!found) {
+                        console.warn('ZIP asset not found:', url, 'assetDir:', assetDir);
+                        return url;
+                    }
+
+                    if (!zipCache.has(found.path)) {
+                        zipCache.set(found.path, found.entry.async('blob'));
+                    }
+
+                    const promise = zipCache.get(found.path);
+                    // LoadingManager URL modifier is synchronous, so store a temporary
+                    // object URL lazily through a pre-built map below instead.
+                    return url;
+                }
+
+                if (sourceType === 'files') {
+                    const file = findUploadedFile(key) || findUploadedFile(normalized);
+                    if (!file) {
+                        console.warn('Uploaded asset not found:', url, 'assetDir:', assetDir);
+                        return url;
+                    }
+                    if (!fileCache.has(key)) {
+                        fileCache.set(key, makeBlobURL(file));
+                    }
+                    return fileCache.get(key);
+                }
+
+                return url;
+            });
+        }
+
+        // Build a synchronous URL map for ZIP files before starting a loader.
+        async function buildZipURLMap(assetPath) {
+            const map = new Map();
+            if (!loadedZip) return map;
+
+            const assetDir = dirname(assetPath);
+            const entries = Object.keys(loadedZip.files)
+                .filter(k => !loadedZip.files[k].dir)
+                .map(normalizeAssetPath);
+
+            for (const path of entries) {
+                try {
+                    const blob = await loadedZip.files[path].async('blob');
+                    const url = makeBlobURL(blob);
+                    map.set(path, url);
+                } catch (e) {
+                    console.warn('Could not create Blob URL for', path, e);
+                }
+            }
+
+            return { map, assetDir, entries };
+        }
+
+        function resolveFromMap(url, mapInfo) {
+            const clean = stripQueryHash(url);
+            if (/^(data:|blob:|https?:|file:)/i.test(clean)) return url;
+
+            const normalized = normalizeAssetPath(clean);
+            if (mapInfo?.map?.has(normalized)) return mapInfo.map.get(normalized);
+
+            const dir = mapInfo?.assetDir || '';
+            const rel = normalizeAssetPath(dir + normalized);
+            if (mapInfo?.map?.has(rel)) return mapInfo.map.get(rel);
+
+            // Try basename only if unique.
+            const b = basename(normalized).toLowerCase();
+            const matches = [...(mapInfo?.map?.keys() || [])]
+                .filter(k => basename(k).toLowerCase() === b);
+            if (matches.length === 1) return mapInfo.map.get(matches[0]);
+
+            return url;
+        }
+
+        async function createZipLoadingManager(assetPath) {
+            revokeActiveObjectURLs();
+            const mapInfo = await buildZipURLMap(assetPath);
+
+            loadingManager.setURLModifier((url) => resolveFromMap(url, mapInfo));
+
+            return mapInfo;
+        }
+
+        async function createUploadedLoadingManager(assetPath) {
+            revokeActiveObjectURLs();
+
+            const assetDir = dirname(assetPath);
+            const map = new Map();
+            for (const [path, file] of uploadedFiles.entries()) {
+                map.set(path, makeBlobURL(file));
+            }
+
+            const mapInfo = { map, assetDir };
+            loadingManager.setURLModifier((url) => resolveFromMap(url, mapInfo));
+            return mapInfo;
+        }
 
         function init() {
             const container = document.getElementById('canvas-container');
+
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0e0e13);
 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera = new THREE.PerspectiveCamera(
+                45,
+                window.innerWidth / window.innerHeight,
+                0.01,
+                1000
+            );
             camera.position.set(0, 1.2, 3.2);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                powerPreference: "high-performance"
+            });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.outputEncoding = THREE.sRGBEncoding;
@@ -284,23 +532,42 @@
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0.9, 0);
             controls.enableDamping = true;
+            controls.enablePan = true;
+            controls.screenSpacePanning = true;
 
-            // Fixed Size Floor Mesh (မော်ဒယ်ထက် ကြီးမသွားစေရန် ပုံသေ 5x5 ထားသည်)
             floorMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(5, 5),
-                new THREE.MeshStandardMaterial({ color: 0x181824, roughness: 0.85, metalness: 0.1 })
+                new THREE.PlaneGeometry(8, 8),
+                new THREE.MeshStandardMaterial({
+                    color: 0x181824,
+                    roughness: 0.85,
+                    metalness: 0.1
+                })
             );
             floorMesh.rotation.x = -Math.PI / 2;
             floorMesh.position.y = 0;
             floorMesh.receiveShadow = true;
             scene.add(floorMesh);
 
-            // Container Wrapper to safely handle orientation & offset
             modelWrapper = new THREE.Group();
             scene.add(modelWrapper);
 
-            colladaLoader = new THREE.ColladaLoader();
-            gltfLoader = new THREE.GLTFLoader();
+            // One shared manager is important: GLTF/Collada dependencies
+            // (textures / .bin / images) must use the same URL mapping.
+            loadingManager = new THREE.LoadingManager();
+            loadingManager.onStart = (url) => updateToast("Loading: " + basename(url));
+            loadingManager.onProgress = (url, loaded, total) => {
+                if (total > 0) updateToast(`Loading ${loaded}/${total}: ${basename(url)}`);
+            };
+            loadingManager.onError = (url) => {
+                console.error('Three.js resource load error:', url);
+                updateToast('Resource missing: ' + basename(url));
+            };
+            loadingManager.onLoad = () => {
+                if (lastLoadedModelName) updateToast('Loaded: ' + lastLoadedModelName);
+            };
+
+            colladaLoader = new THREE.ColladaLoader(loadingManager);
+            gltfLoader = new THREE.GLTFLoader(loadingManager);
 
             setupLights();
             populateBoneDropdown();
@@ -333,13 +600,27 @@
         }
 
         function updateLights() {
-            const angle = THREE.MathUtils.degToRad(parseFloat(document.getElementById('key-angle').value));
+            const angle = THREE.MathUtils.degToRad(
+                parseFloat(document.getElementById('key-angle').value)
+            );
             const dist = 3.5;
-            keyLight.position.set(Math.cos(angle) * dist, 3.2, Math.sin(angle) * dist);
-            keyLight.intensity = parseFloat(document.getElementById('key-intensity').value);
-            fillLight.position.set(-Math.cos(angle) * dist, 2.0, -Math.sin(angle) * dist);
+            keyLight.position.set(
+                Math.cos(angle) * dist,
+                3.2,
+                Math.sin(angle) * dist
+            );
+            keyLight.intensity = parseFloat(
+                document.getElementById('key-intensity').value
+            );
+            fillLight.position.set(
+                -Math.cos(angle) * dist,
+                2.0,
+                -Math.sin(angle) * dist
+            );
             rimLight.position.set(0, 3.0, -2.5);
-            rimLight.intensity = parseFloat(document.getElementById('rim-intensity').value);
+            rimLight.intensity = parseFloat(
+                document.getElementById('rim-intensity').value
+            );
         }
 
         function resetLights() {
@@ -350,67 +631,162 @@
         }
 
         function applyLightingPreset(type) {
-            if (type === 'studio') resetLights();
-            else if (type === 'daylight') {
-                keyLight.position.set(2, 4, 2); keyLight.intensity = 2.2; rimLight.intensity = 0.4;
+            if (type === 'studio') {
+                resetLights();
+            } else if (type === 'daylight') {
+                keyLight.position.set(2, 4, 2);
+                keyLight.intensity = 2.2;
+                rimLight.intensity = 0.4;
             } else if (type === 'stage') {
-                keyLight.intensity = 0.4; rimLight.intensity = 4.0;
+                keyLight.intensity = 0.4;
+                rimLight.intensity = 4.0;
             }
         }
 
         async function tryAutoLoadZip() {
-            updateToast("Connecting to models.zip...");
-            const candidates = ['models.zip', './models.zip', 'Models.zip', './Models.zip'];
+            updateToast("Searching for models.zip...");
+
+            // GitHub Pages: same-directory ZIP is the safest default.
+            const candidates = [
+                './models.zip',
+                'models.zip',
+                './Models.zip',
+                'Models.zip',
+                './assets/models.zip',
+                './models/models.zip'
+            ];
+
             let foundBlob = null;
+            let foundURL = null;
 
             for (const url of candidates) {
                 try {
-                    const res = await fetch(url);
-                    if (res.ok) { foundBlob = await res.blob(); break; }
-                } catch (e) {}
+                    const res = await fetch(url, { cache: 'no-store' });
+                    if (res.ok) {
+                        foundBlob = await res.blob();
+                        foundURL = url;
+                        break;
+                    }
+                } catch (e) {
+                    console.warn('Auto-load failed for', url, e);
+                }
             }
 
-            if (foundBlob) {
-                try {
-                    loadedZip = await JSZip.loadAsync(foundBlob);
-                    setZipBadge(true, "models.zip Active");
-                    displayZipContents();
-                    await onModelConfigChange();
-                } catch (e) {
-                    setZipBadge(false, "ZIP Read Error");
-                    updateToast("models.zip ဖတ်မရပါ");
-                }
-            } else {
+            if (!foundBlob) {
                 setZipBadge(false, "Upload Required");
-                updateToast("Data tab မှ မော်ဒယ်ဖိုင် တင်ပေးပါ");
+                updateToast("models.zip မတွေ့ပါ — Data tab မှ Upload လုပ်ပါ");
+                return;
+            }
+
+            try {
+                loadedZip = await JSZip.loadAsync(foundBlob);
+                setZipBadge(true, "ZIP Active");
+                displayZipContents();
+                const files = getZip3DFiles();
+
+                if (!files.length) {
+                    throw new Error("ZIP ထဲမှာ .dae / .glb / .gltf မရှိပါ");
+                }
+
+                updateToast("ZIP ready: " + foundURL);
+                await onModelConfigChange();
+            } catch (e) {
+                loadedZip = null;
+                showLoaderError("ZIP Read Error", e);
             }
         }
 
         async function onFileUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+            const files = [...(e.target.files || [])];
+            if (!files.length) return;
 
-            const name = file.name.toLowerCase();
-            if (name.endsWith('.zip')) {
-                updateToast("Extracting " + file.name + "...");
+            // Clear stale state before loading the new selection.
+            loadedZip = null;
+            uploadedFiles.clear();
+            revokeActiveObjectURLs();
+
+            const zipFile = files.find(f => f.name.toLowerCase().endsWith('.zip'));
+
+            if (zipFile) {
+                updateToast("Extracting " + zipFile.name + "...");
                 try {
-                    loadedZip = await JSZip.loadAsync(file);
-                    setZipBadge(true, file.name);
+                    loadedZip = await JSZip.loadAsync(zipFile);
+                    setZipBadge(true, zipFile.name);
                     displayZipContents();
+
+                    const list = getZip3DFiles();
+                    if (!list.length) throw new Error("ZIP ထဲမှာ supported 3D model မတွေ့ပါ");
+
                     await onModelConfigChange();
                 } catch (err) {
-                    alert("ZIP ဖတ်မရပါ: " + err.message);
+                    loadedZip = null;
+                    showLoaderError("ZIP ဖတ်မရပါ", err);
                 }
-            } else if (name.endsWith('.dae')) {
-                updateToast("Rendering " + file.name + "...");
-                const text = await file.text();
-                parseAndLoadDae(text, file.name);
-            } else if (name.endsWith('.glb') || name.endsWith('.gltf')) {
-                updateToast("Rendering " + file.name + "...");
-                const buffer = await file.arrayBuffer();
-                gltfLoader.parse(buffer, '', (gltf) => {
-                    loadRealHumanModel(gltf.scene, file.name);
-                });
+                return;
+            }
+
+            // Direct/multi-file import. This lets .gltf resolve companion
+            // .bin and texture files selected at the same time.
+            for (const file of files) {
+                uploadedFiles.set(normalizeAssetPath(file.name), file);
+            }
+
+            const modelFile =
+                files.find(f => /\.(dae|glb|gltf)$/i.test(f.name));
+
+            if (!modelFile) {
+                updateToast("DAE / GLB / GLTF ဖိုင် တစ်ခု ရွေးပါ");
+                return;
+            }
+
+            setZipBadge(true, "Files Active");
+            displayUploadedContents();
+
+            const assetPath = normalizeAssetPath(modelFile.webkitRelativePath || modelFile.name);
+            await loadUploadedModel(assetPath, modelFile);
+        }
+
+        function displayUploadedContents() {
+            const list = document.getElementById('zip-file-list');
+            const items = [...uploadedFiles.keys()]
+                .filter(k => /\.(dae|glb|gltf)$/i.test(k))
+                .sort();
+
+            list.innerHTML = items.length
+                ? items.map(x => `• ${escapeHTML(x)}`).join('<br>')
+                : 'No 3D files found.';
+            document.getElementById('zip-direct-group').style.display =
+                items.length > 0 ? 'block' : 'none';
+
+            const select = document.getElementById('sel-zip-file');
+            select.innerHTML = '';
+            items.forEach(path => {
+                const opt = document.createElement('option');
+                opt.value = path;
+                opt.innerText = basename(path);
+                select.appendChild(opt);
+            });
+        }
+
+        async function loadUploadedModel(assetPath, file) {
+            const low = file.name.toLowerCase();
+            updateToast("Rendering " + file.name + "...");
+
+            try {
+                await createUploadedLoadingManager(assetPath);
+
+                if (low.endsWith('.dae')) {
+                    const text = await file.text();
+                    parseAndLoadDae(text, file.name, dirname(assetPath));
+                } else if (low.endsWith('.glb')) {
+                    const buffer = await file.arrayBuffer();
+                    parseGLTFBuffer(buffer, dirname(assetPath), file.name);
+                } else {
+                    const text = await file.text();
+                    parseGLTFBuffer(text, dirname(assetPath), file.name);
+                }
+            } catch (err) {
+                showLoaderError("Model Load Error", err);
             }
         }
 
@@ -431,49 +807,87 @@
 
         function displayZipContents() {
             if (!loadedZip) return;
+
             const select = document.getElementById('sel-zip-file');
             select.innerHTML = '';
-            const files = getZip3DFiles();
-            files.sort().forEach(f => {
+
+            const files = getZip3DFiles().sort();
+            files.forEach(f => {
                 const opt = document.createElement('option');
                 opt.value = f;
-                opt.innerText = f.split('/').pop();
+                opt.innerText = basename(f);
                 select.appendChild(opt);
             });
-            document.getElementById('zip-direct-group').style.display = files.length > 0 ? 'block' : 'none';
+
+            document.getElementById('zip-direct-group').style.display =
+                files.length > 0 ? 'block' : 'none';
+
+            document.getElementById('zip-file-list').innerHTML = files.length
+                ? files.map(x => `• ${escapeHTML(x)}`).join('<br>')
+                : 'No supported 3D model files found.';
         }
 
         async function loadSpecificZipFile(path) {
-            if (!loadedZip || !loadedZip.files[path]) return;
+            if (!loadedZip || !loadedZip.files[path]) {
+                updateToast("မော်ဒယ်ဖိုင် မတွေ့ပါ: " + path);
+                return;
+            }
+
             const entry = loadedZip.files[path];
-            const name = path.split('/').pop();
+            const name = basename(path);
+            currentAssetPath = normalizeAssetPath(path);
+            lastLoadedModelName = name;
+
             updateToast("Rendering " + name + "...");
 
-            if (name.toLowerCase().endsWith('.dae')) {
-                const text = await entry.async("text");
-                parseAndLoadDae(text, name);
-            } else {
-                const buffer = await entry.async("arraybuffer");
-                gltfLoader.parse(buffer, '', (gltf) => {
-                    loadRealHumanModel(gltf.scene, name);
-                });
+            try {
+                await createZipLoadingManager(currentAssetPath);
+
+                const lower = name.toLowerCase();
+
+                if (lower.endsWith('.dae')) {
+                    const text = await entry.async("text");
+                    parseAndLoadDae(text, name, dirname(currentAssetPath));
+                } else if (lower.endsWith('.glb')) {
+                    const buffer = await entry.async("arraybuffer");
+                    parseGLTFBuffer(buffer, dirname(currentAssetPath), name);
+                } else if (lower.endsWith('.gltf')) {
+                    const text = await entry.async("text");
+                    parseGLTFBuffer(text, dirname(currentAssetPath), name);
+                }
+            } catch (err) {
+                showLoaderError("Model Load Error", err);
             }
         }
 
         function onDirectFilePicked(path) {
-            const low = path.toLowerCase();
-            if (low.includes('asian') && !low.includes('caucasian')) document.getElementById('sel-ethnic').value = 'asian';
-            else if (low.includes('african')) document.getElementById('sel-ethnic').value = 'african';
-            else if (low.includes('caucasian') || low.includes('caucasia')) document.getElementById('sel-ethnic').value = 'caucasian';
+            if (!path) return;
 
-            if (low.includes('female')) document.getElementById('sel-gender').value = 'female';
-            else if (low.includes('male') && !low.includes('female')) document.getElementById('sel-gender').value = 'male';
+            const low = path.toLowerCase();
+            if (low.includes('asian') && !low.includes('caucasian')) {
+                document.getElementById('sel-ethnic').value = 'asian';
+            } else if (low.includes('african')) {
+                document.getElementById('sel-ethnic').value = 'african';
+            } else if (low.includes('caucasian') || low.includes('caucasia')) {
+                document.getElementById('sel-ethnic').value = 'caucasian';
+            }
+
+            if (low.includes('female')) {
+                document.getElementById('sel-gender').value = 'female';
+            } else if (low.includes('male') && !low.includes('female')) {
+                document.getElementById('sel-gender').value = 'male';
+            }
 
             ['adult','teen','child','toddler','elderly'].forEach(a => {
                 if (low.includes(a)) document.getElementById('sel-age').value = a;
             });
 
-            loadSpecificZipFile(path);
+            if (loadedZip) {
+                loadSpecificZipFile(path);
+            } else if (uploadedFiles.size) {
+                const file = uploadedFiles.get(normalizeAssetPath(path));
+                if (file) loadUploadedModel(normalizeAssetPath(path), file);
+            }
         }
 
         function findBestZipMatch(ethnic, gender, age) {
@@ -488,19 +902,21 @@
             let maxScore = -1;
 
             for (const path of files) {
-                const low = path.toLowerCase().split('/').pop();
+                const low = basename(path).toLowerCase();
                 let score = 0;
 
-                if (e === 'asian') {
-                    if (low.includes('asian') && !low.includes('caucasian') && !low.includes('caucasia')) score += 1000;
-                } else if (e === 'african') {
-                    if (low.includes('african')) score += 1000;
-                } else if (e === 'caucasian') {
-                    if (low.includes('caucasian') || low.includes('caucasia')) score += 1000;
-                }
+                if (e === 'asian' &&
+                    low.includes('asian') &&
+                    !low.includes('caucasian') &&
+                    !low.includes('caucasia')) score += 1000;
+
+                if (e === 'african' && low.includes('african')) score += 1000;
+
+                if (e === 'caucasian' &&
+                    (low.includes('caucasian') || low.includes('caucasia'))) score += 1000;
 
                 if (g === 'female' && low.includes('female')) score += 100;
-                else if (g === 'male' && low.includes('male') && !low.includes('female')) score += 100;
+                if (g === 'male' && low.includes('male') && !low.includes('female')) score += 100;
 
                 if (low.includes(a)) score += 10;
 
@@ -515,11 +931,13 @@
 
         async function onModelConfigChange() {
             if (!loadedZip) return;
+
             const ethnic = document.getElementById('sel-ethnic').value;
             const gender = document.getElementById('sel-gender').value;
             const age = document.getElementById('sel-age').value;
 
             const matchedPath = findBestZipMatch(ethnic, gender, age);
+
             if (!matchedPath) {
                 updateToast("မော်ဒယ်ဖိုင် ရှာမတွေ့ပါ");
                 return;
@@ -529,39 +947,97 @@
             await loadSpecificZipFile(matchedPath);
         }
 
-        function parseAndLoadDae(daeText, filename) {
+        function parseAndLoadDae(daeText, filename, resourcePath) {
             try {
-                // Remove textures & broken tags that halt Three.js
-                let clean = daeText.replace(/<init_from>[\s\S]*?<\/init_from>/gi, '<init_from></init_from>');
-                clean = clean.replace(/<transparent[\s\S]*?<\/transparent>/gi, '');
+                currentAssetPath = normalizeAssetPath(resourcePath || '');
+                const collada = colladaLoader.parse(
+                    daeText,
+                    resourcePath || ''
+                );
 
-                const collada = colladaLoader.parse(clean, '');
-                const targetScene = collada.scene || (collada.scenes && collada.scenes[0]);
-                if (!targetScene) throw new Error("Invalid Collada hierarchy");
+                const targetScene =
+                    collada.scene ||
+                    (collada.scenes && collada.scenes[0]);
+
+                if (!targetScene) {
+                    throw new Error("Invalid Collada hierarchy");
+                }
 
                 loadRealHumanModel(targetScene, filename);
             } catch (err) {
-                alert("DAE Parse Error: " + err.message);
-                updateToast("DAE Error: " + err.message);
+                showLoaderError("DAE Parse Error", err);
             }
         }
 
-        function loadRealHumanModel(model, filename) {
-            // Remove previous model from wrapper
+        function parseGLTFBuffer(data, resourcePath, filename) {
+            try {
+                gltfLoader.parse(
+                    data,
+                    resourcePath || '',
+                    (gltf) => {
+                        if (!gltf || !gltf.scene) {
+                            showLoaderError(
+                                "GLTF Error",
+                                new Error("GLTF has no scene")
+                            );
+                            return;
+                        }
+                        loadRealHumanModel(gltf.scene, filename);
+                    },
+                    (error) => {
+                        showLoaderError(
+                            "GLTF Parse Error",
+                            error || new Error("Unknown GLTF error")
+                        );
+                    }
+                );
+            } catch (err) {
+                showLoaderError("GLTF Parse Error", err);
+            }
+        }
+
+        function clearCurrentModel() {
+            if (!modelWrapper) return;
+
             while (modelWrapper.children.length > 0) {
-                modelWrapper.remove(modelWrapper.children[0]);
+                const child = modelWrapper.children[0];
+                modelWrapper.remove(child);
+
+                child.traverse((obj) => {
+                    if (obj.isMesh) {
+                        if (obj.geometry) obj.geometry.dispose?.();
+
+                        const materials = Array.isArray(obj.material)
+                            ? obj.material
+                            : [obj.material];
+
+                        materials.forEach(mat => {
+                            if (!mat) return;
+                            if (mat.map) mat.map.dispose?.();
+                            mat.dispose?.();
+                        });
+                    }
+                });
             }
 
-            characterModel = model;
+            characterModel = null;
             bones = {};
             initialRotations = {};
             currentDeltas = {};
+        }
+
+        function loadRealHumanModel(model, filename) {
+            clearCurrentModel();
+
+            characterModel = model;
+            lastLoadedModelName = filename;
 
             characterModel.position.set(0, 0, 0);
             characterModel.scale.set(1, 1, 1);
             characterModel.rotation.set(0, 0, 0);
 
-            const activeShading = document.getElementById('sel-shading').value;
+            const activeShading =
+                document.getElementById('sel-shading').value;
 
             characterModel.traverse((child) => {
                 child.visible = true;
@@ -571,56 +1047,79 @@
                     child.castShadow = true;
                     child.receiveShadow = true;
 
-                    // Compute original geometry bounds
                     if (child.geometry) {
                         child.geometry.computeBoundingBox();
                         child.geometry.computeVertexNormals();
                     }
 
                     const isSkinned = Boolean(child.isSkinnedMesh);
-                    const mat = createArtistMaterial(activeShading, isSkinned);
+                    const mat = createArtistMaterial(
+                        activeShading,
+                        isSkinned
+                    );
+
                     if (Array.isArray(child.material)) {
                         child.material = child.material.map(() => mat.clone());
                     } else {
                         child.material = mat;
                     }
 
-                    if (child.isSkinnedMesh && child.skeleton && child.skeleton.bones) {
+                    if (child.isSkinnedMesh &&
+                        child.skeleton &&
+                        child.skeleton.bones) {
                         child.skeleton.bones.forEach(b => {
-                            if (b && b.name) {
-                                b.matrixAutoUpdate = true;
-                                if (!b.userData.restQuat) b.userData.restQuat = b.quaternion.clone();
-                                bones[b.name] = b;
+                            if (!b) return;
+                            b.matrixAutoUpdate = true;
+                            if (!b.userData.restQuat) {
+                                b.userData.restQuat = b.quaternion.clone();
                             }
+                            if (b.name) bones[b.name] = b;
                         });
                     }
                 }
+
                 if (child.isBone || child.type === 'Bone') {
-                    if (child.name) {
-                        child.matrixAutoUpdate = true;
-                        if (!child.userData.restQuat) child.userData.restQuat = child.quaternion.clone();
-                        bones[child.name] = child;
+                    child.matrixAutoUpdate = true;
+                    if (!child.userData.restQuat) {
+                        child.userData.restQuat = child.quaternion.clone();
                     }
+                    if (child.name) bones[child.name] = child;
                 }
             });
 
             Object.keys(bones).forEach(bName => {
                 const b = bones[bName];
                 b.updateMatrix();
-                initialRotations[bName] = { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z };
+                initialRotations[bName] = {
+                    x: b.rotation.x,
+                    y: b.rotation.y,
+                    z: b.rotation.z
+                };
                 currentDeltas[bName] = { x: 0, y: 0, z: 0 };
             });
 
             modelWrapper.add(characterModel);
 
-            // NORMALIZE MODEL SCALE & ALIGN TO GROUND (Standard Height: 1.75m)
             normalizeAndCenterModel(characterModel);
 
-            document.getElementById('rig-status-box').innerHTML = `<span style="color:#4ade80;">● Active:</span> <b>${filename}</b> (${Object.keys(bones).length} Bones)`;
-            updateToast("Active: " + filename);
+            document.getElementById('rig-status-box').innerHTML =
+                `<span style="color:#4ade80;">● Active:</span> ` +
+                `<b>${escapeHTML(filename)}</b> ` +
+                `(${Object.keys(bones).length} Bones)`;
+
+            setZipBadge(true, "Model Active");
+            updateToast(
+                `Loaded: ${filename} • ${countMeshes(characterModel)} meshes`
+            );
+            loadBoneRotations();
         }
 
-        // Automatic Height Scaler & Positioning (Decimeter/Meter agnostic)
+        function countMeshes(root) {
+            let n = 0;
+            root?.traverse?.(o => { if (o.isMesh) n++; });
+            return n;
+        }
+
         function normalizeAndCenterModel(model) {
             if (!model) return;
 
@@ -630,26 +1129,22 @@
             if (rawBox.isEmpty()) return;
 
             const size = rawBox.getSize(new THREE.Vector3());
-            const center = rawBox.getCenter(new THREE.Vector3());
 
-            // Target height = 1.75 Three.js units (Meters)
+            // Target human height in Three.js units.
             const targetHeight = 1.75;
             const currentHeight = size.y > 0 ? size.y : 1;
             const scaleFactor = targetHeight / currentHeight;
 
-            model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+            model.scale.setScalar(scaleFactor);
             model.updateMatrixWorld(true);
 
-            // Recalculate aligned box
             const scaledBox = new THREE.Box3().setFromObject(model);
             const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
 
-            // Center horizontally, set feet to Y = 0
             model.position.x = -scaledCenter.x;
             model.position.z = -scaledCenter.z;
             model.position.y = -scaledBox.min.y;
 
-            // Camera focus at human eye level (~1.3m), orbit center at 0.9m
             camera.position.set(0, 1.25, 2.6);
             controls.target.set(0, 0.9, 0);
             camera.lookAt(0, 0.9, 0);
@@ -669,60 +1164,117 @@
             };
 
             if (mode === 'clay') {
-                return new THREE.MeshStandardMaterial({ ...params, color: 0xd6cbb8 });
+                return new THREE.MeshStandardMaterial({
+                    ...params,
+                    color: 0xd6cbb8
+                });
             } else if (mode === 'planar') {
-                return new THREE.MeshStandardMaterial({ ...params, color: 0xd2d2dc, flatShading: true });
+                return new THREE.MeshStandardMaterial({
+                    ...params,
+                    color: 0xd2d2dc,
+                    flatShading: true
+                });
             } else if (mode === 'ecorche') {
-                return new THREE.MeshStandardMaterial({ ...params, color: 0x9b3838, roughness: 0.65 });
+                return new THREE.MeshStandardMaterial({
+                    ...params,
+                    color: 0x9b3838,
+                    roughness: 0.65
+                });
             } else if (mode === 'wireframe') {
-                return new THREE.MeshBasicMaterial({ color: 0x6366f1, wireframe: true });
+                // MeshBasicMaterial does not need skinning, but keeping
+                // the geometry visible is the priority in wireframe mode.
+                return new THREE.MeshBasicMaterial({
+                    color: 0x6366f1,
+                    wireframe: true,
+                    side: THREE.DoubleSide
+                });
             }
-            return new THREE.MeshStandardMaterial({ ...params, color: 0xcccccc });
+
+            return new THREE.MeshStandardMaterial({
+                ...params,
+                color: 0xcccccc
+            });
         }
 
         function applyShadingMode(mode) {
             if (!characterModel) return;
+
             characterModel.traverse((child) => {
-                if (child.isMesh) {
-                    const isSkinned = Boolean(child.isSkinnedMesh);
-                    const mat = createArtistMaterial(mode, isSkinned);
-                    if (Array.isArray(child.material)) {
-                        child.material = child.material.map(() => mat.clone());
-                    } else {
-                        child.material = mat;
-                    }
+                if (!child.isMesh) return;
+
+                const isSkinned = Boolean(child.isSkinnedMesh);
+                const mat = createArtistMaterial(mode, isSkinned);
+
+                if (Array.isArray(child.material)) {
+                    child.material = child.material.map(() => mat.clone());
+                } else {
+                    child.material = mat;
                 }
             });
         }
 
         function resolveBoneName(key) {
             if (bones[key]) return key;
+
             const lower = key.toLowerCase();
-            return Object.keys(bones).find(b => {
+            const exactOrSuffix = Object.keys(bones).find(b => {
                 const target = b.toLowerCase();
-                return target === lower || target.endsWith('_' + lower) || target.endsWith(lower);
+                return target === lower ||
+                       target.endsWith('_' + lower) ||
+                       target.endsWith(lower);
             });
+
+            if (exactOrSuffix) return exactOrSuffix;
+
+            // More tolerant fallback for common Blender/Rigify naming variants.
+            const aliases = {
+                head: ['head', 'skull'],
+                neck01: ['neck', 'neck1'],
+                spine03: ['spine03', 'spine_03', 'chest', 'upperchest'],
+                spine01: ['spine01', 'spine_01', 'abdomen', 'waist'],
+                root: ['root', 'pelvis', 'hips'],
+                upperarm01_l: ['upperarm01_l', 'upperarm_l', 'upper_arm_l', 'leftarm'],
+                lowerarm01_l: ['lowerarm01_l', 'forearm_l', 'lower_arm_l', 'leftforearm'],
+                upperarm01_r: ['upperarm01_r', 'upperarm_r', 'upper_arm_r', 'rightarm'],
+                lowerarm01_r: ['lowerarm01_r', 'forearm_r', 'lower_arm_r', 'rightforearm'],
+                upperleg01_l: ['upperleg01_l', 'thigh_l', 'upperleg_l', 'leftthigh'],
+                lowerleg01_l: ['lowerleg01_l', 'calf_l', 'shin_l', 'leftleg'],
+                upperleg01_r: ['upperleg01_r', 'thigh_r', 'upperleg_r', 'rightthigh'],
+                lowerleg01_r: ['lowerleg01_r', 'calf_r', 'shin_r', 'rightleg']
+            };
+
+            const wanted = (aliases[lower] || [lower]).map(x => x.toLowerCase());
+            return Object.keys(bones).find(name =>
+                wanted.some(alias => name.toLowerCase().includes(alias))
+            );
         }
 
         function populateBoneDropdown() {
             const select = document.getElementById('sel-bone');
             select.innerHTML = '';
+
             MAJOR_BONES.forEach(item => {
                 const opt = document.createElement('option');
                 opt.value = item.key;
                 opt.innerText = item.label;
                 select.appendChild(opt);
             });
+
             loadBoneRotations();
         }
 
         function loadBoneRotations() {
             const key = document.getElementById('sel-bone').value;
             const actualName = resolveBoneName(key);
-            const delta = (actualName && currentDeltas[actualName]) ? currentDeltas[actualName] : { x: 0, y: 0, z: 0 };
+            const delta =
+                (actualName && currentDeltas[actualName])
+                    ? currentDeltas[actualName]
+                    : { x: 0, y: 0, z: 0 };
+
             document.getElementById('rot-x').value = delta.x;
             document.getElementById('rot-y').value = delta.y;
             document.getElementById('rot-z').value = delta.z;
+
             document.getElementById('val-rx').innerText = delta.x + '°';
             document.getElementById('val-ry').innerText = delta.y + '°';
             document.getElementById('val-rz').innerText = delta.z + '°';
@@ -731,13 +1283,14 @@
         function updateBoneRotation() {
             const key = document.getElementById('sel-bone').value;
             const actualName = resolveBoneName(key);
-            if (!actualName || !bones[actualName]) return;
 
             const dx = parseFloat(document.getElementById('rot-x').value);
             const dy = parseFloat(document.getElementById('rot-y').value);
             const dz = parseFloat(document.getElementById('rot-z').value);
 
-            applyRotationToBone(actualName, dx, dy, dz);
+            if (actualName && bones[actualName]) {
+                applyRotationToBone(actualName, dx, dy, dz);
+            }
 
             document.getElementById('val-rx').innerText = dx + '°';
             document.getElementById('val-ry').innerText = dy + '°';
@@ -756,7 +1309,9 @@
                 THREE.MathUtils.degToRad(dz),
                 'XYZ'
             );
-            const deltaQuat = new THREE.Quaternion().setFromEuler(deltaEuler);
+
+            const deltaQuat =
+                new THREE.Quaternion().setFromEuler(deltaEuler);
 
             b.quaternion.copy(b.userData.restQuat).multiply(deltaQuat);
             b.updateMatrix();
@@ -771,9 +1326,11 @@
         function resetCurrentBone() {
             const key = document.getElementById('sel-bone').value;
             const actualName = resolveBoneName(key);
+
             document.getElementById('rot-x').value = 0;
             document.getElementById('rot-y').value = 0;
             document.getElementById('rot-z').value = 0;
+
             if (actualName) applyRotationToBone(actualName, 0, 0, 0);
             loadBoneRotations();
         }
@@ -787,11 +1344,15 @@
                     currentDeltas[bName] = { x: 0, y: 0, z: 0 };
                 }
             });
+
             if (characterModel) {
                 characterModel.traverse((child) => {
-                    if (child.isSkinnedMesh && child.skeleton) child.skeleton.update();
+                    if (child.isSkinnedMesh && child.skeleton) {
+                        child.skeleton.update();
+                    }
                 });
             }
+
             loadBoneRotations();
         }
 
@@ -844,6 +1405,16 @@
             }
 
             loadBoneRotations();
+        }
+
+        function escapeHTML(str) {
+            return String(str).replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }[ch]));
         }
 
         function onWindowResize() {
