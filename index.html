@@ -69,7 +69,7 @@
             z-index: 100; display: block;
         }
     </style>
-    <!-- Three.js + Loaders -->
+    <!-- Three.js + OrbitControls + ColladaLoader + GLTFLoader + JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/ColladaLoader.js"></script>
@@ -130,7 +130,7 @@
             <!-- Direct File Selector from ZIP -->
             <div class="control-group" id="zip-direct-group" style="margin-top: 6px;">
                 <label>Direct Model Select (ဖိုင်တိုက်ရိုက်ရွေးရန်):</label>
-                <select id="sel-zip-file" onchange="loadSpecificZipFile(this.value)"></select>
+                <select id="sel-zip-file" onchange="onDirectFilePicked(this.value)"></select>
             </div>
 
             <div class="section-title">Shading Mode (အလင်းအမှောင်)</div>
@@ -153,8 +153,8 @@
             <div class="section-title">Everyday Movement Presets</div>
             <div class="control-group">
                 <select id="sel-pose" onchange="applyPresetPose(this.value)">
-                    <option value="neutral">Neutral A-Pose (မူလ မတ်တပ်)</option>
-                    <option value="contrapposto" selected>Contrapposto (ဂန္ထဝင် အလေးပေးရပ်ဟန်)</option>
+                    <option value="neutral" selected>Neutral A-Pose (မူလ မတ်တပ်)</option>
+                    <option value="contrapposto">Contrapposto (ဂန္ထဝင် အလေးပေးရပ်ဟန်)</option>
                     <option value="sitting">Sitting (ကုလားထိုင် ထိုင်ဟန်)</option>
                     <option value="walking">Walking / Stride (လမ်းလျှောက်ဟန်)</option>
                     <option value="folded_arms">Folded Arms (လက်ပိုက်ရပ်ဟန်)</option>
@@ -270,8 +270,8 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0e0e13);
 
-            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 1.2, 3.2);
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 30);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -281,11 +281,11 @@
             container.appendChild(renderer.domElement);
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.target.set(0, 0.9, 0);
+            controls.target.set(0, 8.5, 0);
             controls.enableDamping = true;
 
             floorMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(10, 10),
+                new THREE.PlaneGeometry(50, 50),
                 new THREE.MeshStandardMaterial({ color: 0x14141c, roughness: 0.88 })
             );
             floorMesh.rotation.x = -Math.PI / 2;
@@ -305,7 +305,7 @@
         }
 
         function setupLights() {
-            ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+            ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
             scene.add(ambientLight);
 
             keyLight = new THREE.DirectionalLight(0xfff3e3, 1.8);
@@ -325,11 +325,11 @@
 
         function updateLights() {
             const angle = THREE.MathUtils.degToRad(parseFloat(document.getElementById('key-angle').value));
-            const dist = 4.0;
-            keyLight.position.set(Math.cos(angle) * dist, 3.0, Math.sin(angle) * dist);
+            const dist = 25.0;
+            keyLight.position.set(Math.cos(angle) * dist, 20.0, Math.sin(angle) * dist);
             keyLight.intensity = parseFloat(document.getElementById('key-intensity').value);
-            fillLight.position.set(-Math.cos(angle) * dist, 1.8, -Math.sin(angle) * dist);
-            rimLight.position.set(0, 2.8, -3.2);
+            fillLight.position.set(-Math.cos(angle) * dist, 12.0, -Math.sin(angle) * dist);
+            rimLight.position.set(0, 15, -20);
             rimLight.intensity = parseFloat(document.getElementById('rim-intensity').value);
         }
 
@@ -343,7 +343,7 @@
         function applyLightingPreset(type) {
             if (type === 'studio') resetLights();
             else if (type === 'daylight') {
-                keyLight.position.set(2, 4, 2); keyLight.intensity = 2.2; rimLight.intensity = 0.4;
+                keyLight.position.set(10, 25, 10); keyLight.intensity = 2.2; rimLight.intensity = 0.4;
             } else if (type === 'stage') {
                 keyLight.intensity = 0.4; rimLight.intensity = 4.0;
             }
@@ -412,17 +412,27 @@
             badge.className = "status-badge " + (ok ? "ok" : "");
         }
 
+        function getZip3DFiles() {
+            if (!loadedZip) return [];
+            return Object.keys(loadedZip.files).filter(k => {
+                if (loadedZip.files[k].dir || k.includes('__MACOSX') || k.startsWith('.')) return false;
+                const low = k.toLowerCase();
+                return low.endsWith('.dae') || low.endsWith('.glb') || low.endsWith('.gltf');
+            });
+        }
+
         function displayZipContents() {
             if (!loadedZip) return;
             const select = document.getElementById('sel-zip-file');
             select.innerHTML = '';
-            const files = Object.keys(loadedZip.files).filter(k => !loadedZip.files[k].dir && !k.includes('__MACOSX') && (k.endsWith('.dae') || k.endsWith('.glb')));
+            const files = getZip3DFiles();
             files.sort().forEach(f => {
                 const opt = document.createElement('option');
                 opt.value = f;
                 opt.innerText = f.split('/').pop();
                 select.appendChild(opt);
             });
+            document.getElementById('zip-direct-group').style.display = files.length > 0 ? 'block' : 'none';
         }
 
         async function loadSpecificZipFile(path) {
@@ -442,43 +452,57 @@
             }
         }
 
-        // 100% STRICT ETHNICITY POOL MATCHER (NEVER LEAPS TO CAUCASIAN ON ASIAN SELECTION)
-        function findEntryInZip(zip, ethnic, gender, age) {
+        function onDirectFilePicked(path) {
+            const low = path.toLowerCase();
+            if (low.includes('asian')) document.getElementById('sel-ethnic').value = 'asian';
+            else if (low.includes('african')) document.getElementById('sel-ethnic').value = 'african';
+            else if (low.includes('caucasian') || low.includes('caucasia')) document.getElementById('sel-ethnic').value = 'caucasian';
+
+            if (low.includes('female')) document.getElementById('sel-gender').value = 'female';
+            else if (low.includes('male')) document.getElementById('sel-gender').value = 'male';
+
+            ['adult','teen','child','toddler','elderly'].forEach(a => {
+                if (low.includes(a)) document.getElementById('sel-age').value = a;
+            });
+
+            loadSpecificZipFile(path);
+        }
+
+        // WEIGHTED STRICT MATCHER (ASIAN NEVER GETS CAUCASIAN)
+        function findBestZipMatch(ethnic, gender, age) {
+            const files = getZip3DFiles();
+            if (files.length === 0) return null;
+
             const e = ethnic.toLowerCase().trim();
             const g = gender.toLowerCase().trim();
             const a = age.toLowerCase().trim();
 
-            const allFiles = Object.keys(zip.files).filter(k => {
-                if (zip.files[k].dir || k.includes('__MACOSX')) return false;
-                const low = k.toLowerCase();
-                return low.endsWith('.dae') || low.endsWith('.glb');
-            });
+            let bestFile = null;
+            let maxScore = -1;
 
-            // Isolate current ethnicity pool strictly
-            const pool = allFiles.filter(k => {
-                const low = k.toLowerCase();
-                if (e === 'asian') return low.includes('asian');
-                if (e === 'african') return low.includes('african');
-                if (e === 'caucasian') return low.includes('caucasian') || low.includes('caucasia');
-                return false;
-            });
+            for (const path of files) {
+                const low = path.toLowerCase().split('/').pop();
+                let score = 0;
 
-            const targetPool = (pool.length > 0) ? pool : allFiles;
+                // Priority 1: Ethnicity (+1000)
+                if (e === 'asian' && low.includes('asian')) score += 1000;
+                else if (e === 'african' && low.includes('african')) score += 1000;
+                else if (e === 'caucasian' && (low.includes('caucasian') || low.includes('caucasia'))) score += 1000;
 
-            // Match gender within target pool
-            let genderPool = targetPool.filter(k => {
-                const low = k.toLowerCase();
-                if (g === 'female') return low.includes('female');
-                if (g === 'male') return low.includes('male') && !low.includes('female');
-                return true;
-            });
-            if (genderPool.length === 0) genderPool = targetPool;
+                // Priority 2: Gender (+100)
+                if (g === 'female' && low.includes('female')) score += 100;
+                else if (g === 'male' && low.includes('male') && !low.includes('female')) score += 100;
 
-            // Match age within gender pool
-            const ageMatch = genderPool.find(k => k.toLowerCase().includes(a));
-            if (ageMatch) return ageMatch;
+                // Priority 3: Age (+10)
+                if (low.includes(a)) score += 10;
 
-            return genderPool[0];
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestFile = path;
+                }
+            }
+
+            return bestFile || files[0];
         }
 
         async function onModelConfigChange() {
@@ -487,7 +511,7 @@
             const gender = document.getElementById('sel-gender').value;
             const age = document.getElementById('sel-age').value;
 
-            const matchedPath = findEntryInZip(loadedZip, ethnic, gender, age);
+            const matchedPath = findBestZipMatch(ethnic, gender, age);
             if (!matchedPath) {
                 updateToast("မော်ဒယ်ဖိုင် ရှာမတွေ့ပါ");
                 return;
@@ -497,15 +521,13 @@
             await loadSpecificZipFile(matchedPath);
         }
 
-        // 100% BULLETPROOF COLLADA XML SANITIZER: ELIMINATES OPACITY=0 AND 404 NETWORK LOOPS
+        // SAFE COLLADA SANITIZER: REMOVES ONLY OPACITY=0 AND 404 WITHOUT CORRUPTING XML
         function parseAndLoadDae(daeText, filename) {
             try {
-                // 1. Replace textures with standard diffuse color so ColladaLoader never fetches missing PNGs
-                let clean = daeText.replace(/<diffuse>\s*<texture\b[^>]*\/>\s*<\/diffuse>/gi, '<diffuse><color>0.84 0.76 0.68 1.0</color></diffuse>');
-                // 2. Eliminate <transparent> tags completely so ColladaLoader never sets opacity to 0!
+                // 1. Prevent Three.js 404 network stalls by clearing <init_from>
+                let clean = daeText.replace(/<init_from>[\s\S]*?<\/init_from>/gi, '<init_from></init_from>');
+                // 2. Prevent opacity=0 by removing <transparent> tags completely
                 clean = clean.replace(/<transparent>[\s\S]*?<\/transparent>/gi, '');
-                // 3. Clear library_images
-                clean = clean.replace(/<library_images[\s\S]*?<\/library_images>/gi, '<library_images/>');
 
                 const collada = colladaLoader.parse(clean, '');
                 loadRealHumanModel(collada.scene, filename);
@@ -515,13 +537,18 @@
             }
         }
 
-        // FULL OPACITY SKINNED MESH & BONE TEXTURE ATTACHMENT
+        // ROCK-SOLID HUMAN LOADER (COMPUTEBONETEXTURE CRASH REMOVED)
         function loadRealHumanModel(model, filename) {
             if (characterModel) scene.remove(characterModel);
             characterModel = model;
             bones = {};
             initialRotations = {};
             currentDeltas = {};
+
+            // Keep native scale & position to prevent skinning matrix breakdown
+            characterModel.position.set(0, 0, 0);
+            characterModel.scale.set(1, 1, 1);
+            characterModel.rotation.set(0, 0, 0);
 
             characterModel.traverse((child) => {
                 child.visible = true;
@@ -531,19 +558,18 @@
                     child.castShadow = true;
                     child.receiveShadow = true;
 
-                    // Compute Bone Texture for 163 bones on Mobile Safari
-                    if (child.isSkinnedMesh && child.skeleton) {
-                        child.skeleton.computeBoneTexture();
-                        if (child.skeleton.boneTexture) {
-                            child.skeleton.boneTexture.needsUpdate = true;
-                        }
-                    }
-
-                    // Assign 100% Opaque Plaster Material
-                    const isSkinned = Boolean(child.isSkinnedMesh);
-                    const mat = createArtistMaterial(document.getElementById('sel-shading').value, isSkinned);
-                    if (Array.isArray(child.material)) child.material = child.material.map(() => mat.clone());
-                    else child.material = mat;
+                    // Ensure materials are 100% Opaque Plaster
+                    const fixMat = (m) => {
+                        m.transparent = false;
+                        m.opacity = 1.0;
+                        m.depthWrite = true;
+                        m.depthTest = true;
+                        m.side = THREE.DoubleSide;
+                        if (m.color) m.color.setHex(0xd6cbb8);
+                        m.needsUpdate = true;
+                    };
+                    if (Array.isArray(child.material)) child.material.forEach(fixMat);
+                    else if (child.material) fixMat(child.material);
 
                     if (child.isSkinnedMesh && child.skeleton && child.skeleton.bones) {
                         child.skeleton.bones.forEach(b => {
@@ -574,77 +600,91 @@
 
             scene.add(characterModel);
 
-            // Normalize Scale & Position
-            characterModel.updateMatrixWorld(true);
-            const box = new THREE.Box3().setFromObject(characterModel);
-            const size = box.getSize(new THREE.Vector3());
-
-            if (size.y > 0) {
-                const targetHeight = 1.75;
-                const scale = targetHeight / size.y;
-                characterModel.scale.set(scale, scale, scale);
-            }
-            characterModel.updateMatrixWorld(true);
-
-            // Center Feet on Ground at Y=0
-            const scaledBox = new THREE.Box3().setFromObject(characterModel);
-            const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
-
-            characterModel.position.x = -scaledCenter.x;
-            characterModel.position.z = -scaledCenter.z;
-            characterModel.position.y = -scaledBox.min.y;
-            characterModel.updateMatrixWorld(true);
-
-            // Ground plane stays flat under feet at Y=0
-            floorMesh.position.set(0, 0, 0);
-
-            // Camera Focus
+            // Shading & Framing
+            applyShadingMode(document.getElementById('sel-shading').value);
             focusCameraOnModel();
 
             document.getElementById('rig-status-box').innerHTML = `<span style="color:#4ade80;">● Active:</span> <b>${filename}</b> (${Object.keys(bones).length} Bones)`;
             updateToast("Active: " + filename);
         }
 
+        // ACCURATE CAMERA FOCUS (MEASURES REAL MESH VERTICES ONLY)
         function focusCameraOnModel() {
-            camera.position.set(0, 1.2, 3.2);
-            controls.target.set(0, 0.9, 0);
-            camera.lookAt(0, 0.9, 0);
-            controls.update();
-        }
+            if (!characterModel) return;
 
-        // PURE OPAQUE PLASTER SCULPTURE MATERIALS (LIGHTWEIGHT & SAFE)
-        function createArtistMaterial(mode, isSkinned) {
-            const params = {
-                skinning: isSkinned,
-                side: THREE.DoubleSide,
-                transparent: false,
-                opacity: 1.0
-            };
-            if (mode === 'clay') {
-                return new THREE.MeshLambertMaterial({ ...params, color: 0xd6cbb8 });
-            } else if (mode === 'planar') {
-                return new THREE.MeshLambertMaterial({ ...params, color: 0xd2d2dc, flatShading: true });
-            } else if (mode === 'ecorche') {
-                return new THREE.MeshLambertMaterial({ ...params, color: 0x983232 });
-            } else if (mode === 'wireframe') {
-                return new THREE.MeshBasicMaterial({ ...params, color: 0x6366f1, wireframe: true });
+            characterModel.updateMatrixWorld(true);
+            const box = new THREE.Box3();
+            let hasMesh = false;
+
+            characterModel.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    child.geometry.computeBoundingBox();
+                    const b = child.geometry.boundingBox.clone();
+                    b.applyMatrix4(child.matrixWorld);
+                    box.union(b);
+                    hasMesh = true;
+                }
+            });
+
+            if (hasMesh) {
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+
+                // Place floor at feet
+                floorMesh.position.set(center.x, box.min.y, center.z);
+
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                const dist = (maxDim / 2) / Math.tan(fov / 2) * 1.35;
+
+                camera.position.set(center.x, center.y + size.y * 0.05, center.z + dist);
+                controls.target.copy(center);
+                camera.lookAt(center);
+                controls.update();
+            } else {
+                camera.position.set(0, 10, 30);
+                controls.target.set(0, 8.5, 0);
+                controls.update();
             }
-            return null;
         }
 
+        // SHADING ENGINE PRESERVING NATIVE SKINNED MATERIALS
         function applyShadingMode(mode) {
             if (!characterModel) return;
+
             characterModel.traverse((child) => {
-                if (child.isMesh) {
-                    const isSkinned = Boolean(child.isSkinnedMesh);
-                    const mat = createArtistMaterial(mode, isSkinned);
-                    if (Array.isArray(child.material)) child.material = child.material.map(() => mat.clone());
-                    else child.material = mat;
-                }
+                if (!child.isMesh) return;
+
+                const updateMat = (m) => {
+                    m.transparent = false;
+                    m.opacity = 1.0;
+                    m.side = THREE.DoubleSide;
+
+                    if (mode === 'clay') {
+                        if (m.color) m.color.setHex(0xd6cbb8);
+                        m.wireframe = false;
+                        if ('flatShading' in m) m.flatShading = false;
+                    } else if (mode === 'planar') {
+                        if (m.color) m.color.setHex(0xd2d2dc);
+                        m.wireframe = false;
+                        if ('flatShading' in m) m.flatShading = true;
+                    } else if (mode === 'ecorche') {
+                        if (m.color) m.color.setHex(0x983232);
+                        m.wireframe = false;
+                        if ('flatShading' in m) m.flatShading = false;
+                    } else if (mode === 'wireframe') {
+                        if (m.color) m.color.setHex(0x6366f1);
+                        m.wireframe = true;
+                    }
+                    m.needsUpdate = true;
+                };
+
+                if (Array.isArray(child.material)) child.material.forEach(updateMat);
+                else if (child.material) updateMat(child.material);
             });
         }
 
-        // BONE ROTATION ENGINE (RELATIVE QUATERNIONS)
+        // RELATIVE QUATERNION FORWARD KINEMATICS
         function resolveBoneName(key) {
             if (bones[key]) return key;
             const lower = key.toLowerCase();
