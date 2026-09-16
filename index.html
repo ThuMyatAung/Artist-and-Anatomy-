@@ -36,6 +36,7 @@
 
         h2 { font-size: 14px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: space-between; }
         .status-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 500; background: #064e3b; color: #6ee7b7; }
+        .status-badge.error { background: #4c1d1d; color: #f87171; }
 
         .tabs { display: flex; gap: 4px; margin: 10px 0; background: #14141c; padding: 3px; border-radius: 8px; }
         .tab { flex: 1; text-align: center; padding: 6px 0; font-size: 11px; border-radius: 6px; cursor: pointer; color: #8a8a9a; }
@@ -88,12 +89,11 @@
             <span id="zip-badge" class="status-badge">Connecting...</span>
         </h2>
 
-        <!-- TABS: 1. Model -> 2. Posing -> 3. Lighting -> 4. Data -->
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('tab-model')">Model</div>
-            <div class="tab" onclick="switchTab('tab-pose')">Posing</div>
-            <div class="tab" onclick="switchTab('tab-light')">Lighting</div>
-            <div class="tab" onclick="switchTab('tab-file')">Data</div>
+            <div class="tab active" onclick="switchTab(event, 'tab-model')">Model</div>
+            <div class="tab" onclick="switchTab(event, 'tab-pose')">Posing</div>
+            <div class="tab" onclick="switchTab(event, 'tab-light')">Lighting</div>
+            <div class="tab" onclick="switchTab(event, 'tab-file')">Data</div>
         </div>
 
         <!-- TAB 1: MODEL SELECTION -->
@@ -127,7 +127,6 @@
                 </div>
             </div>
 
-            <!-- Direct File Selector from ZIP -->
             <div class="control-group" id="zip-direct-group" style="margin-top: 6px;">
                 <label>Direct Model Select (ဖိုင်တိုက်ရိုက်ရွေးရန်):</label>
                 <select id="sel-zip-file" onchange="onDirectFilePicked(this.value)"></select>
@@ -146,9 +145,9 @@
             <button onclick="focusCameraOnModel()" style="margin-top: 8px; width: 100%;">🎯 Center & Focus View</button>
         </div>
 
-        <!-- TAB 2: POSING & MOVEMENTS -->
+        <!-- TAB 2: POSING -->
         <div id="tab-pose" class="tab-content">
-            <div id="rig-status-box">● Model Active</div>
+            <div id="rig-status-box">● Model Inactive</div>
 
             <div class="section-title">Everyday Movement Presets</div>
             <div class="control-group">
@@ -216,7 +215,7 @@
         <div id="tab-file" class="tab-content">
             <div class="section-title">ZIP / Direct File Upload</div>
             <p id="zip-msg" style="font-size: 11px; color: #94a3b8; line-height: 1.4; margin-bottom: 8px;">
-                <code>models.zip</code> သို့မဟုတ် သီးသန့် <code>.dae</code> / <code>.glb</code> ဖိုင်ကို အောက်ပါခလုတ်မှ တင်နိုင်ပါသည်-
+                <code>models.zip</code> သို့မဟုတ် သီးသန့် <code>.dae</code> / <code>.glb</code> ဖိုင်ကို ရွေးချယ်တင်သွင်းနိုင်ပါသည်-
             </p>
             <input type="file" id="zip-input" accept=".zip,.dae,.glb,.gltf" onchange="onFileUpload(event)" style="width: 100%;">
             <div id="zip-file-list" style="margin-top: 10px; font-size: 10px; color: #64748b; max-height: 120px; overflow-y: auto;"></div>
@@ -233,11 +232,12 @@
             btn.innerText = isUIHidden ? "⚙️ Show UI" : "👁️ Hide UI";
         }
 
-        function switchTab(id) {
+        function switchTab(e, id) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            event.target.classList.add('active');
-            document.getElementById(id).classList.add('active');
+            if (e && e.currentTarget) e.currentTarget.classList.add('active');
+            const target = document.getElementById(id);
+            if (target) target.classList.add('active');
         }
 
         function updateToast(txt) {
@@ -270,7 +270,7 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0e0e13);
 
-            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.05, 1000);
             camera.position.set(0, 1.2, 3.2);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -278,6 +278,7 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
             container.appendChild(renderer.domElement);
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -285,8 +286,8 @@
             controls.enableDamping = true;
 
             floorMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(1, 1),
-                new THREE.MeshStandardMaterial({ color: 0x14141c, roughness: 0.88 })
+                new THREE.PlaneGeometry(10, 10),
+                new THREE.MeshStandardMaterial({ color: 0x14141c, roughness: 0.88, metalness: 0.1 })
             );
             floorMesh.rotation.x = -Math.PI / 2;
             floorMesh.receiveShadow = true;
@@ -301,20 +302,21 @@
             window.addEventListener('resize', onWindowResize);
             animate();
 
-            setTimeout(tryAutoLoadZip, 200);
+            setTimeout(tryAutoLoadZip, 250);
         }
 
         function setupLights() {
-            ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+            ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
             scene.add(ambientLight);
 
             keyLight = new THREE.DirectionalLight(0xfff3e3, 1.8);
             keyLight.castShadow = true;
             keyLight.shadow.mapSize.width = 1024;
             keyLight.shadow.mapSize.height = 1024;
+            keyLight.shadow.bias = -0.0005;
             scene.add(keyLight);
 
-            fillLight = new THREE.DirectionalLight(0x8eb3ff, 0.6);
+            fillLight = new THREE.DirectionalLight(0x8eb3ff, 0.7);
             scene.add(fillLight);
 
             rimLight = new THREE.DirectionalLight(0xffffff, 2.5);
@@ -349,7 +351,6 @@
             }
         }
 
-        // AUTO-LOAD MODELS.ZIP
         async function tryAutoLoadZip() {
             updateToast("Connecting to models.zip...");
             const candidates = ['models.zip', './models.zip', 'Models.zip', './Models.zip'];
@@ -369,12 +370,12 @@
                     displayZipContents();
                     await onModelConfigChange();
                 } catch (e) {
-                    setZipBadge(false, "ZIP Error");
+                    setZipBadge(false, "ZIP Read Error");
                     updateToast("models.zip ဖတ်မရပါ");
                 }
             } else {
-                setZipBadge(false, "models.zip Not Found");
-                updateToast("Data tab မှ models.zip ကို ရွေးပေးပါ");
+                setZipBadge(false, "Upload Required");
+                updateToast("Data tab မှ မော်ဒယ်ဖိုင် တင်ပေးပါ");
             }
         }
 
@@ -402,6 +403,8 @@
                 const buffer = await file.arrayBuffer();
                 gltfLoader.parse(buffer, '', (gltf) => {
                     loadRealHumanModel(gltf.scene, file.name);
+                }, (err) => {
+                    alert("GLTF Parse Error: " + err.message);
                 });
             }
         }
@@ -409,7 +412,7 @@
         function setZipBadge(ok, text) {
             const badge = document.getElementById('zip-badge');
             badge.innerText = text;
-            badge.className = "status-badge " + (ok ? "ok" : "");
+            badge.className = "status-badge " + (ok ? "" : "error");
         }
 
         function getZip3DFiles() {
@@ -448,6 +451,8 @@
                 const buffer = await entry.async("arraybuffer");
                 gltfLoader.parse(buffer, '', (gltf) => {
                     loadRealHumanModel(gltf.scene, name);
+                }, (err) => {
+                    alert("GLTF Parse Error: " + err.message);
                 });
             }
         }
@@ -468,7 +473,6 @@
             loadSpecificZipFile(path);
         }
 
-        // ACCURATE STRICT MATCHER (ASIAN NEVER GETS CAUCASIAN)
         function findBestZipMatch(ethnic, gender, age) {
             const files = getZip3DFiles();
             if (files.length === 0) return null;
@@ -484,8 +488,6 @@
                 const low = path.toLowerCase().split('/').pop();
                 let score = 0;
 
-                // Priority 1: Ethnicity (+1000)
-                // Strict Asian: Must have 'asian' and MUST NOT have 'caucasian'
                 if (e === 'asian') {
                     if (low.includes('asian') && !low.includes('caucasian') && !low.includes('caucasia')) score += 1000;
                 } else if (e === 'african') {
@@ -494,11 +496,9 @@
                     if (low.includes('caucasian') || low.includes('caucasia')) score += 1000;
                 }
 
-                // Priority 2: Gender (+100)
                 if (g === 'female' && low.includes('female')) score += 100;
                 else if (g === 'male' && low.includes('male') && !low.includes('female')) score += 100;
 
-                // Priority 3: Age (+10)
                 if (low.includes(a)) score += 10;
 
                 if (score > maxScore) {
@@ -526,23 +526,23 @@
             await loadSpecificZipFile(matchedPath);
         }
 
-        // SAFE COLLADA SANITIZER: REMOVES OPACITY=0 AND MISSING TEXTURES
         function parseAndLoadDae(daeText, filename) {
             try {
-                // 1. Prevent Three.js 404 network stalls by clearing <init_from>
                 let clean = daeText.replace(/<init_from>[\s\S]*?<\/init_from>/gi, '<init_from></init_from>');
-                // 2. Prevent opacity=0 by removing <transparent> tags completely
                 clean = clean.replace(/<transparent[\s\S]*?<\/transparent>/gi, '');
 
                 const collada = colladaLoader.parse(clean, '');
-                loadRealHumanModel(collada.scene, filename);
+                const targetScene = collada.scene || (collada.scenes && collada.scenes[0]);
+                if (!targetScene) {
+                    throw new Error("Invalid Collada hierarchy");
+                }
+                loadRealHumanModel(targetScene, filename);
             } catch (err) {
                 alert("DAE Parse Error: " + err.message);
                 updateToast("DAE Error: " + err.message);
             }
         }
 
-        // 100% BULLETPROOF LOADER (NO CRASHING FUNCTIONS)
         function loadRealHumanModel(model, filename) {
             if (characterModel) scene.remove(characterModel);
             characterModel = model;
@@ -554,6 +554,8 @@
             characterModel.scale.set(1, 1, 1);
             characterModel.rotation.set(0, 0, 0);
 
+            const activeShading = document.getElementById('sel-shading').value;
+
             characterModel.traverse((child) => {
                 child.visible = true;
                 child.frustumCulled = false;
@@ -562,11 +564,13 @@
                     child.castShadow = true;
                     child.receiveShadow = true;
 
-                    // Assign 100% Opaque Plaster Material
                     const isSkinned = Boolean(child.isSkinnedMesh);
-                    const mat = createArtistMaterial(document.getElementById('sel-shading').value, isSkinned);
-                    if (Array.isArray(child.material)) child.material = child.material.map(() => mat.clone());
-                    else child.material = mat;
+                    const mat = createArtistMaterial(activeShading, isSkinned);
+                    if (Array.isArray(child.material)) {
+                        child.material = child.material.map(() => mat.clone());
+                    } else {
+                        child.material = mat;
+                    }
 
                     if (child.isSkinnedMesh && child.skeleton && child.skeleton.bones) {
                         child.skeleton.bones.forEach(b => {
@@ -587,7 +591,6 @@
                 }
             });
 
-            // Cache Initial Bone Rotations
             Object.keys(bones).forEach(bName => {
                 const b = bones[bName];
                 b.updateMatrix();
@@ -596,77 +599,48 @@
             });
 
             scene.add(characterModel);
-
-            // Dynamic Auto-Framing: Centers and scales view to match model perfectly
             autoFrameModel(characterModel);
 
             document.getElementById('rig-status-box').innerHTML = `<span style="color:#4ade80;">● Active:</span> <b>${filename}</b> (${Object.keys(bones).length} Bones)`;
             updateToast("Active: " + filename);
         }
 
-        // ACCURATE DYNAMIC AUTO-FRAMING (NEVER LOSES SIGHT OF MODEL)
         function autoFrameModel(model) {
             if (!model) return;
 
             model.updateMatrixWorld(true);
 
-            const box = new THREE.Box3();
-            let hasMesh = false;
-            model.traverse((child) => {
-                if (child.isMesh && child.geometry) {
-                    child.geometry.computeBoundingBox();
-                    if (child.geometry.boundingBox) {
-                        const b = child.geometry.boundingBox.clone();
-                        b.applyMatrix4(child.matrixWorld);
-                        box.union(b);
-                        hasMesh = true;
-                    }
-                }
-            });
-
-            if (!hasMesh || box.isEmpty()) return;
+            const box = new THREE.Box3().setFromObject(model);
+            if (box.isEmpty()) return;
 
             const center = box.getCenter(new THREE.Vector3());
 
-            // Shift model so feet rest at Y = 0, center at X = 0, Z = 0
             model.position.x -= center.x;
             model.position.z -= center.z;
             model.position.y -= box.min.y;
             model.updateMatrixWorld(true);
 
-            // Recompute box after alignment
-            const finalBox = new THREE.Box3();
-            model.traverse((child) => {
-                if (child.isMesh && child.geometry && child.geometry.boundingBox) {
-                    const b = child.geometry.boundingBox.clone();
-                    b.applyMatrix4(child.matrixWorld);
-                    finalBox.union(b);
-                }
-            });
-
+            const finalBox = new THREE.Box3().setFromObject(model);
             const finalSize = finalBox.getSize(new THREE.Vector3());
             const finalCenter = finalBox.getCenter(new THREE.Vector3());
             const maxDim = Math.max(finalSize.x, finalSize.y, finalSize.z);
 
-            // Position and size floor under the feet
             floorMesh.position.set(0, 0, 0);
             floorMesh.scale.set(Math.max(maxDim * 3, 10), Math.max(maxDim * 3, 10), 1);
 
-            // Position Camera dynamically based on model height
             const fov = camera.fov * (Math.PI / 180);
-            const cameraDist = (maxDim / 2) / Math.tan(fov / 2) * 1.45;
+            const cameraDist = (maxDim / 2) / Math.tan(fov / 2) * 1.5;
 
             camera.near = Math.max(maxDim / 100, 0.05);
-            camera.far = Math.max(maxDim * 50, 500);
+            camera.far = Math.max(maxDim * 60, 500);
             camera.updateProjectionMatrix();
 
-            camera.position.set(0, finalCenter.y, cameraDist);
+            camera.position.set(0, finalCenter.y + (maxDim * 0.1), cameraDist);
             controls.target.copy(finalCenter);
             camera.lookAt(finalCenter);
             controls.update();
 
-            // Adjust lights dynamically to scale with model size
-            const lightDist = Math.max(maxDim * 1.8, 4);
+            const lightDist = Math.max(maxDim * 2.0, 4);
             keyLight.position.set(lightDist * 0.8, lightDist * 1.2, lightDist);
             fillLight.position.set(-lightDist * 0.8, lightDist * 0.6, -lightDist * 0.5);
             rimLight.position.set(0, lightDist * 1.1, -lightDist);
@@ -676,24 +650,26 @@
             if (characterModel) autoFrameModel(characterModel);
         }
 
-        // PURE OPAQUE PLASTER SCULPTURE MATERIALS (LIGHTWEIGHT & SAFE)
         function createArtistMaterial(mode, isSkinned) {
             const params = {
                 skinning: isSkinned,
                 side: THREE.DoubleSide,
                 transparent: false,
-                opacity: 1.0
+                opacity: 1.0,
+                roughness: 0.82,
+                metalness: 0.08
             };
+
             if (mode === 'clay') {
-                return new THREE.MeshLambertMaterial({ ...params, color: 0xd6cbb8 });
+                return new THREE.MeshStandardMaterial({ ...params, color: 0xd6cbb8 });
             } else if (mode === 'planar') {
-                return new THREE.MeshLambertMaterial({ ...params, color: 0xd2d2dc, flatShading: true });
+                return new THREE.MeshStandardMaterial({ ...params, color: 0xd2d2dc, flatShading: true });
             } else if (mode === 'ecorche') {
-                return new THREE.MeshLambertMaterial({ ...params, color: 0x983232 });
+                return new THREE.MeshStandardMaterial({ ...params, color: 0x9b3838, roughness: 0.65 });
             } else if (mode === 'wireframe') {
-                return new THREE.MeshBasicMaterial({ ...params, color: 0x6366f1, wireframe: true });
+                return new THREE.MeshBasicMaterial({ color: 0x6366f1, wireframe: true });
             }
-            return null;
+            return new THREE.MeshStandardMaterial({ ...params, color: 0xcccccc });
         }
 
         function applyShadingMode(mode) {
@@ -702,17 +678,22 @@
                 if (child.isMesh) {
                     const isSkinned = Boolean(child.isSkinnedMesh);
                     const mat = createArtistMaterial(mode, isSkinned);
-                    if (Array.isArray(child.material)) child.material = child.material.map(() => mat.clone());
-                    else child.material = mat;
+                    if (Array.isArray(child.material)) {
+                        child.material = child.material.map(() => mat.clone());
+                    } else {
+                        child.material = mat;
+                    }
                 }
             });
         }
 
-        // BONE ROTATION ENGINE (RELATIVE QUATERNIONS)
         function resolveBoneName(key) {
             if (bones[key]) return key;
             const lower = key.toLowerCase();
-            return Object.keys(bones).find(b => b.toLowerCase() === lower || b.toLowerCase().endsWith('_' + lower) || b.toLowerCase().endsWith(lower));
+            return Object.keys(bones).find(b => {
+                const target = b.toLowerCase();
+                return target === lower || target.endsWith('_' + lower) || target.endsWith(lower);
+            });
         }
 
         function populateBoneDropdown() {
@@ -806,7 +787,6 @@
             loadBoneRotations();
         }
 
-        // PRESET MOVEMENTS
         function applyPresetPose(pose) {
             resetAllBonesToRestPose();
 
