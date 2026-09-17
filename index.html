@@ -59,8 +59,8 @@
         button.primary { background: #4f46e5; border-color: #6366f1; }
         
         #rig-status-box {
-            font-size: 11px; padding: 8px 10px; border-radius: 6px;
-            background: #181824; border: 1px solid #2b2b3d; margin-bottom: 8px; line-height: 1.4;
+            font-size: 11px; padding: 10px; border-radius: 8px;
+            background: #181824; border: 1px solid #2b2b3d; margin-bottom: 10px; line-height: 1.5;
         }
 
         #status-toast {
@@ -147,7 +147,7 @@
 
         <!-- TAB 2: POSING -->
         <div id="tab-pose" class="tab-content">
-            <div id="rig-status-box"><span style="color:#f87171;">● Model Inactive</span></div>
+            <div id="rig-status-box">● Model Inactive</div>
 
             <div class="section-title">Everyday Movement Presets</div>
             <div class="control-group">
@@ -244,21 +244,21 @@
             document.getElementById('status-toast').innerText = txt;
         }
 
-        // Comprehensive Rig Matcher Definition
+        // Comprehensive anatomical aliases for MakeHuman, Blender, Mixamo
         const ANATOMICAL_JOINTS = [
-            { key: 'head', label: 'Head (ဦးခေါင်း)', aliases: ['head', 'skull', 'head01', 'head_01'] },
-            { key: 'neck', label: 'Neck (လည်ပင်း)', aliases: ['neck01', 'neck_01', 'neck', 'neck02'] },
-            { key: 'chest', label: 'Chest (ရင်အုပ်)', aliases: ['spine03', 'spine_03', 'spine02', 'spine_02', 'chest', 'upperchest', 'torso2'] },
-            { key: 'waist', label: 'Waist (ခါး)', aliases: ['spine01', 'spine_01', 'spine', 'abdomen', 'waist', 'torso1'] },
+            { key: 'head', label: 'Head (ဦးခေါင်း)', aliases: ['head', 'skull', 'caput'] },
+            { key: 'neck', label: 'Neck (လည်ပင်း)', aliases: ['neck01', 'neck', 'cervical'] },
+            { key: 'chest', label: 'Chest (ရင်အုပ်)', aliases: ['spine03', 'spine02', 'chest', 'upperchest', 'torso2', 'spine2', 'spine1'] },
+            { key: 'waist', label: 'Waist (ခါး)', aliases: ['spine01', 'spine', 'abdomen', 'waist', 'torso1', 'spine'] },
             { key: 'pelvis', label: 'Pelvis / Root (တင်ပါးဆုံ)', aliases: ['root', 'pelvis', 'hips', 'hip', 'cog', 'center'] },
-            { key: 'upperarm_l', label: 'Left Upper Arm (ဘယ်လက်မောင်း)', aliases: ['upperarm01_l', 'upperarm01.l', 'upperarm_l', 'upperarm.l', 'leftarm', 'leftupperarm', 'arm_l', 'shoulder01_l'] },
-            { key: 'lowerarm_l', label: 'Left Forearm (ဘယ်လက်ဖျံ)', aliases: ['lowerarm01_l', 'lowerarm01.l', 'lowerarm_l', 'lowerarm.l', 'leftforearm', 'forearm_l', 'forearm.l', 'lowerarm_l'] },
-            { key: 'upperarm_r', label: 'Right Upper Arm (ညာလက်မောင်း)', aliases: ['upperarm01_r', 'upperarm01.r', 'upperarm_r', 'upperarm.r', 'rightarm', 'rightupperarm', 'arm_r', 'shoulder01_r'] },
-            { key: 'lowerarm_r', label: 'Right Forearm (ညာလက်ဖျံ)', aliases: ['lowerarm01_r', 'lowerarm01.r', 'lowerarm_r', 'lowerarm.r', 'rightforearm', 'forearm_r', 'forearm.r', 'lowerarm_r'] },
-            { key: 'upperleg_l', label: 'Left Thigh (ဘယ်ပေါင်)', aliases: ['thigh01_l', 'thigh01.l', 'thigh_l', 'thigh.l', 'upperleg01_l', 'upperleg01.l', 'upperleg_l', 'leftupleg', 'leftthigh'] },
-            { key: 'lowerleg_l', label: 'Left Knee (ဘယ်ဒူးခေါင်း)', aliases: ['lowerleg01_l', 'lowerleg01.l', 'calf01_l', 'calf01.l', 'calf_l', 'calf.l', 'shin01_l', 'shin_l', 'shin.l', 'lowerleg_l', 'leftleg', 'leftcalf'] },
-            { key: 'upperleg_r', label: 'Right Thigh (ညာပေါင်)', aliases: ['thigh01_r', 'thigh01.r', 'thigh_r', 'thigh.r', 'upperleg01_r', 'upperleg01.r', 'upperleg_r', 'rightupleg', 'rightthigh'] },
-            { key: 'lowerleg_r', label: 'Right Knee (ညာဒူးခေါင်း)', aliases: ['lowerleg01_r', 'lowerleg01.r', 'calf01_r', 'calf01.r', 'calf_r', 'calf.r', 'shin01_r', 'shin_r', 'shin.r', 'lowerleg_r', 'rightleg', 'rightcalf'] }
+            { key: 'upperarm_l', label: 'Left Upper Arm (ဘယ်လက်မောင်း)', aliases: ['upperarm01_l', 'upperarm_l', 'leftarm', 'leftupperarm', 'arm_l', 'shoulder01_l'] },
+            { key: 'lowerarm_l', label: 'Left Forearm (ဘယ်လက်ဖျံ)', aliases: ['lowerarm01_l', 'lowerarm_l', 'leftforearm', 'forearm_l', 'lowerarm_l'] },
+            { key: 'upperarm_r', label: 'Right Upper Arm (ညာလက်မောင်း)', aliases: ['upperarm01_r', 'upperarm_r', 'rightarm', 'rightupperarm', 'arm_r', 'shoulder01_r'] },
+            { key: 'lowerarm_r', label: 'Right Forearm (ညာလက်ဖျံ)', aliases: ['lowerarm01_r', 'lowerarm_r', 'rightforearm', 'forearm_r', 'lowerarm_r'] },
+            { key: 'upperleg_l', label: 'Left Thigh (ဘယ်ပေါင်)', aliases: ['thigh01_l', 'thigh_l', 'upperleg01_l', 'upperleg_l', 'leftupleg', 'leftthigh', 'femur_l'] },
+            { key: 'lowerleg_l', label: 'Left Knee (ဘယ်ဒူးခေါင်း)', aliases: ['lowerleg01_l', 'calf01_l', 'calf_l', 'shin01_l', 'shin_l', 'lowerleg_l', 'leftleg', 'leftcalf', 'tibia_l'] },
+            { key: 'upperleg_r', label: 'Right Thigh (ညာပေါင်)', aliases: ['thigh01_r', 'thigh_r', 'upperleg01_r', 'upperleg_r', 'rightupleg', 'rightthigh', 'femur_r'] },
+            { key: 'lowerleg_r', label: 'Right Knee (ညာဒူးခေါင်း)', aliases: ['lowerleg01_r', 'calf01_r', 'calf_r', 'shin01_r', 'shin_r', 'lowerleg_r', 'rightleg', 'rightcalf', 'tibia_r'] }
         ];
 
         let scene, camera, renderer, controls, modelWrapper, floorPedestal, floorGrid;
@@ -566,25 +566,33 @@
             currentDeltas = {};
 
             const activeShading = document.getElementById('sel-shading').value;
+            let skinnedMeshCount = 0;
+            let staticMeshCount = 0;
 
-            // 1. Gather all meshes and bones
             characterModel.traverse((child) => {
                 child.visible = true;
                 child.frustumCulled = false;
 
-                if (child.isMesh) {
+                if (child.isSkinnedMesh) {
+                    skinnedMeshCount++;
                     child.castShadow = true;
                     child.receiveShadow = true;
 
-                    const isSkinned = Boolean(child.isSkinnedMesh && child.skeleton && child.skeleton.bones.length > 0);
-                    child.material = createArtistMaterial(activeShading, isSkinned);
+                    // FORCE SKINNING: SkinnedMesh ဖြစ်ပါက skinning ကို အမြဲ On ထားရမည်
+                    child.material = createArtistMaterial(activeShading, true);
 
-                    if (isSkinned) {
+                    if (child.skeleton && child.skeleton.bones) {
                         child.skeleton.bones.forEach(b => {
                             if (b && b.name) registerBone(b);
                         });
                     }
+                } else if (child.isMesh) {
+                    staticMeshCount++;
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    child.material = createArtistMaterial(activeShading, false);
                 }
+
                 if (child.isBone || child.type === 'Bone') {
                     if (child.name) registerBone(child);
                 }
@@ -593,22 +601,32 @@
             modelWrapper.add(characterModel);
             calibrateModelWrapper();
 
-            // 2. Perform Intelligent Anatomical Auto-Mapping
             mapAnatomicalBones();
-
-            // 3. Update Dropdown and Rig Status Box
             populateBoneDropdown();
 
             const boneCount = Object.keys(bones).length;
+            const mappedCount = Object.keys(boneMap).length;
             const rigBox = document.getElementById('rig-status-box');
 
             if (boneCount === 0) {
-                rigBox.innerHTML = `<span style="color:#f87171; font-weight:700;">⚠️ No Skeleton/Bones Found!</span><br><span style="font-size:10px; color:#94a3b8;">မော်ဒယ်ထဲတွင် အရိုးမပါဝင်ပါ။ MakeHuman ၏ <b>Geometries > Rigging</b> မှ <i>Default</i> သို့မဟုတ် <i>Game Engine</i> rig ရွေး၍ export ပြန်လုပ်ပေးပါ။</span>`;
+                rigBox.innerHTML = `
+                    <div style="color:#f87171; font-weight:700; margin-bottom:4px;">⚠️ အရိုး (Bones) လုံးဝ မပါဝင်ပါ!</div>
+                    <div style="font-size:10px; color:#cbd5e1; line-height:1.4;">
+                        ဒီ <code>${filename}</code> ဖိုင်ထဲမှာ Armature/Bones မရှိပါ (Static Mesh ဖြစ်နေသည်)။<br>
+                        👉 MakeHuman ထဲတွင် <b>Geometries > Rigging</b> သို့သွား၍ <b>Default</b> သို့မဟုတ် <b>Game engine</b> rig ကို ရွေးချယ်ပြီးမှ DAE ကို Export ပြန်လုပ်ပေးပါ။
+                    </div>
+                `;
             } else {
-                rigBox.innerHTML = `<span style="color:#4ade80;">● Rig Active:</span> <b>${filename}</b><br><span style="color:#94a3b8; font-size:10px;">${boneCount} Bones Ready • Anatomical Controls Connected</span>`;
+                rigBox.innerHTML = `
+                    <div style="color:#4ade80; font-weight:700;">● Rig Active: ${filename}</div>
+                    <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
+                        • စုစုပေါင်း အရိုး: <b>${boneCount}</b> ခု တွေ့ရှိသည်<br>
+                        • အဓိက အဆစ်များနှင့် ချိတ်ဆက်မိမှု: <b>${mappedCount} / ${ANATOMICAL_JOINTS.length}</b> ခု ချိတ်ဆက်ပြီး
+                    </div>
+                `;
             }
 
-            updateToast(`Loaded: ${filename} (${boneCount} bones)`);
+            updateToast(`Active: ${filename} (${boneCount} bones)`);
         }
 
         function registerBone(b) {
@@ -619,7 +637,6 @@
             currentDeltas[b.name] = { x: 0, y: 0, z: 0 };
         }
 
-        // Smart Fuzzy Matcher for Any 3D Rig Structure
         function mapAnatomicalBones() {
             boneMap = {};
             const allBoneNames = Object.keys(bones);
@@ -627,7 +644,6 @@
             ANATOMICAL_JOINTS.forEach(joint => {
                 let matched = null;
 
-                // Priority 1: Exact / Cleaned Name Match
                 for (const alias of joint.aliases) {
                     const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
                     matched = allBoneNames.find(name => {
@@ -637,7 +653,6 @@
                     if (matched) break;
                 }
 
-                // Priority 2: Suffix or Substring Match
                 if (!matched) {
                     for (const alias of joint.aliases) {
                         const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -649,9 +664,7 @@
                     }
                 }
 
-                if (matched) {
-                    boneMap[joint.key] = matched;
-                }
+                if (matched) boneMap[joint.key] = matched;
             });
         }
 
@@ -659,7 +672,6 @@
             const select = document.getElementById('sel-bone');
             select.innerHTML = '';
 
-            // Group 1: Standard Body Controls
             const stdGroup = document.createElement('optgroup');
             stdGroup.label = "── Major Body Joints ──";
 
@@ -667,16 +679,15 @@
                 const opt = document.createElement('option');
                 opt.value = item.key;
                 const actual = boneMap[item.key];
-                opt.innerText = item.label + (actual ? ` (${actual})` : ' [Not Found]');
+                opt.innerText = item.label + (actual ? ` (${actual})` : ' [❌ Not Found]');
                 stdGroup.appendChild(opt);
             });
             select.appendChild(stdGroup);
 
-            // Group 2: All Raw Detected Bones
             const rawBones = Object.keys(bones).sort();
             if (rawBones.length > 0) {
                 const allGroup = document.createElement('optgroup');
-                allGroup.label = "── All Raw Rig Bones ──";
+                allGroup.label = "── All Raw Detected Bones ──";
                 rawBones.forEach(bName => {
                     const opt = document.createElement('option');
                     opt.value = "raw:" + bName;
@@ -749,13 +760,14 @@
             if (!characterModel) return;
             characterModel.traverse((child) => {
                 if (child.isMesh) {
-                    const isSkinned = Boolean(child.isSkinnedMesh && child.skeleton && child.skeleton.bones.length > 0);
+                    const isSkinned = Boolean(child.isSkinnedMesh);
                     child.material = createArtistMaterial(mode, isSkinned);
                 }
             });
         }
 
         function getActualBoneName(keyOrRaw) {
+            if (!keyOrRaw) return null;
             if (keyOrRaw.startsWith("raw:")) {
                 return keyOrRaw.substring(4);
             }
@@ -808,9 +820,9 @@
             b.quaternion.copy(b.userData.restQuat).multiply(deltaQuat);
             b.updateMatrix();
 
-            // Crucial: Update world hierarchy so skinning updates immediately
+            // Scene-wide Matrix Update & Immediate Skeleton Synchronization
+            scene.updateMatrixWorld(true);
             if (characterModel) {
-                characterModel.updateMatrixWorld(true);
                 characterModel.traverse((child) => {
                     if (child.isSkinnedMesh && child.skeleton) {
                         child.skeleton.update();
@@ -838,8 +850,8 @@
                     currentDeltas[bName] = { x: 0, y: 0, z: 0 };
                 }
             });
+            scene.updateMatrixWorld(true);
             if (characterModel) {
-                characterModel.updateMatrixWorld(true);
                 characterModel.traverse((child) => {
                     if (child.isSkinnedMesh && child.skeleton) child.skeleton.update();
                 });
@@ -847,7 +859,6 @@
             loadBoneRotations();
         }
 
-        // PRESET MOVEMENT POSES (Dynamic, Anatomically Calibrated)
         function applyPresetPose(pose) {
             resetAllBonesToRestPose();
 
