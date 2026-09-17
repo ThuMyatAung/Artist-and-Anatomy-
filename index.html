@@ -244,23 +244,24 @@
             document.getElementById('status-toast').innerText = txt;
         }
 
+        // Exact MakeHuman Skeleton (163-Bones) Alias Dictionary
         const ANATOMICAL_JOINTS = [
-            { key: 'head', label: 'Head (ဦးခေါင်း)', aliases: ['head', 'skull'] },
-            { key: 'neck', label: 'Neck (လည်ပင်း)', aliases: ['neck01', 'neck', 'neck_01'] },
-            { key: 'chest', label: 'Chest (ရင်အုပ်)', aliases: ['spine03', 'spine_03', 'spine3', 'chest', 'upperchest', 'spine02', 'spine2'] },
-            { key: 'waist', label: 'Waist (ခါး)', aliases: ['spine01', 'spine_01', 'spine1', 'spine', 'abdomen', 'waist', 'torso'] },
-            { key: 'pelvis', label: 'Pelvis / Root (တင်ပါးဆုံ)', aliases: ['root', 'pelvis', 'hips', 'hip'] },
-            { key: 'upperarm_l', label: 'Left Upper Arm (ဘယ်လက်မောင်း)', aliases: ['upperarm01_l', 'upperarm01.l', 'upperarm_l', 'arm_l', 'leftarm'] },
-            { key: 'lowerarm_l', label: 'Left Forearm (ဘယ်လက်ဖျံ)', aliases: ['lowerarm01_l', 'lowerarm01.l', 'lowerarm_l', 'forearm_l', 'leftforearm'] },
-            { key: 'upperarm_r', label: 'Right Upper Arm (ညာလက်မောင်း)', aliases: ['upperarm01_r', 'upperarm01.r', 'upperarm_r', 'arm_r', 'rightarm'] },
-            { key: 'lowerarm_r', label: 'Right Forearm (ညာလက်ဖျံ)', aliases: ['lowerarm01_r', 'lowerarm01.r', 'lowerarm_r', 'forearm_r', 'rightforearm'] },
-            { key: 'upperleg_l', label: 'Left Thigh (ဘယ်ပေါင်)', aliases: ['thigh01_l', 'thigh01.l', 'thigh_l', 'upperleg01_l', 'upperleg01.l', 'leftthigh'] },
-            { key: 'lowerleg_l', label: 'Left Knee (ဘယ်ဒူးခေါင်း)', aliases: ['calf01_l', 'calf01.l', 'calf_l', 'lowerleg01_l', 'lowerleg01.l', 'shin_l', 'leftleg'] },
-            { key: 'upperleg_r', label: 'Right Thigh (ညာပေါင်)', aliases: ['thigh01_r', 'thigh01.r', 'thigh_r', 'upperleg01_r', 'upperleg01.r', 'rightthigh'] },
-            { key: 'lowerleg_r', label: 'Right Knee (ညာဒူးခေါင်း)', aliases: ['calf01_r', 'calf01.r', 'calf_r', 'lowerleg01_r', 'lowerleg01.r', 'shin_r', 'rightleg'] }
+            { key: 'head', label: 'Head (ဦးခေါင်း)', aliases: ['head', 'head01', 'skull'] },
+            { key: 'neck', label: 'Neck (လည်ပင်း)', aliases: ['neck01', 'neck02', 'neck'] },
+            { key: 'chest', label: 'Chest (ရင်အုပ်)', aliases: ['spine03', 'spine04', 'spine05', 'chest'] },
+            { key: 'waist', label: 'Waist (ခါး)', aliases: ['spine01', 'spine02', 'spine', 'abdomen'] },
+            { key: 'pelvis', label: 'Pelvis (တင်ပါးဆုံ)', aliases: ['root', 'pelvis', 'hips'] },
+            { key: 'upperarm_l', label: 'Left Upper Arm (ဘယ်လက်မောင်း)', aliases: ['upperarm01_l', 'upperarm02_l', 'upperarm_l'] },
+            { key: 'lowerarm_l', label: 'Left Forearm (ဘယ်လက်ဖျံ)', aliases: ['lowerarm01_l', 'lowerarm02_l', 'lowerarm_l'] },
+            { key: 'upperarm_r', label: 'Right Upper Arm (ညာလက်မောင်း)', aliases: ['upperarm01_r', 'upperarm02_r', 'upperarm_r'] },
+            { key: 'lowerarm_r', label: 'Right Forearm (ညာလက်ဖျံ)', aliases: ['lowerarm01_r', 'lowerarm02_r', 'lowerarm_r'] },
+            { key: 'upperleg_l', label: 'Left Thigh (ဘယ်ပေါင်)', aliases: ['thigh01_l', 'thigh02_l', 'thigh_l'] },
+            { key: 'lowerleg_l', label: 'Left Knee (ဘယ်ဒူးခေါင်း)', aliases: ['calf01_l', 'calf02_l', 'calf_l'] },
+            { key: 'upperleg_r', label: 'Right Thigh (ညာပေါင်)', aliases: ['thigh01_r', 'thigh02_r', 'thigh_r'] },
+            { key: 'lowerleg_r', label: 'Right Knee (ညာဒူးခေါင်း)', aliases: ['calf01_r', 'calf02_r', 'calf_r'] }
         ];
 
-        let scene, camera, renderer, controls, modelWrapper, floorPedestal, floorGrid;
+        let scene, camera, renderer, controls, floorPedestal, floorGrid;
         let characterModel = null, bones = {}, boneMap = {}, initialRotations = {}, currentDeltas = {};
         let keyLight, fillLight, rimLight, ambientLight;
         let loadedZip = null, colladaLoader, gltfLoader;
@@ -271,8 +272,8 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0e0e13);
 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.05, 500);
-            camera.position.set(0, 1.25, 2.7);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 2000);
+            camera.position.set(0, 1.25, 2.8);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -294,13 +295,9 @@
             floorPedestal.receiveShadow = true;
             scene.add(floorPedestal);
 
-            floorGrid = new THREE.GridHelper(6, 12, 0x333346, 0x1a1a24);
+            floorGrid = new THREE.GridHelper(10, 20, 0x333346, 0x1a1a24);
             floorGrid.position.y = 0;
             scene.add(floorGrid);
-
-            // Container Wrapper (မော်ဒယ်အား လူတစ်ရပ်စာ 1.75m အလိုအလျောက်ချုံ့ရန်)
-            modelWrapper = new THREE.Group();
-            scene.add(modelWrapper);
 
             colladaLoader = new THREE.ColladaLoader();
             gltfLoader = new THREE.GLTFLoader();
@@ -314,29 +311,29 @@
         }
 
         function setupLights() {
-            ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
+            ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
             scene.add(ambientLight);
 
             keyLight = new THREE.DirectionalLight(0xfff3e3, 1.8);
             keyLight.castShadow = true;
-            keyLight.position.set(2.5, 3.5, 2.5);
+            keyLight.position.set(5, 8, 5);
             scene.add(keyLight);
 
             fillLight = new THREE.DirectionalLight(0x8eb3ff, 0.7);
-            fillLight.position.set(-2.5, 2.0, -1.5);
+            fillLight.position.set(-5, 4, -3);
             scene.add(fillLight);
 
-            rimLight = new THREE.DirectionalLight(0xffffff, 2.2);
-            rimLight.position.set(0, 3.0, -2.5);
+            rimLight = new THREE.DirectionalLight(0xffffff, 2.0);
+            rimLight.position.set(0, 6, -5);
             scene.add(rimLight);
         }
 
         function updateLights() {
             const angle = THREE.MathUtils.degToRad(parseFloat(document.getElementById('key-angle').value));
-            const dist = 3.5;
-            keyLight.position.set(Math.cos(angle) * dist, 3.2, Math.sin(angle) * dist);
+            const dist = 6.0;
+            keyLight.position.set(Math.cos(angle) * dist, 7.0, Math.sin(angle) * dist);
             keyLight.intensity = parseFloat(document.getElementById('key-intensity').value);
-            fillLight.position.set(-Math.cos(angle) * dist, 2.0, -Math.sin(angle) * dist);
+            fillLight.position.set(-Math.cos(angle) * dist, 4.0, -Math.sin(angle) * dist);
             rimLight.intensity = parseFloat(document.getElementById('rim-intensity').value);
         }
 
@@ -350,13 +347,10 @@
         function applyLightingPreset(type) {
             if (type === 'studio') resetLights();
             else if (type === 'daylight') {
-                document.getElementById('key-intensity').value = 2.2;
-                document.getElementById('rim-intensity').value = 0.4;
+                keyLight.position.set(4, 8, 4); keyLight.intensity = 2.2; rimLight.intensity = 0.4;
             } else if (type === 'stage') {
-                document.getElementById('key-intensity').value = 0.4;
-                document.getElementById('rim-intensity').value = 3.5;
+                keyLight.intensity = 0.4; rimLight.intensity = 4.0;
             }
-            updateLights();
         }
 
         async function tryAutoLoadZip() {
@@ -555,12 +549,15 @@
             }
         }
 
+        // BULLETPROOF LOADER: Native Scale ထိန်းသိမ်းခြင်း + Shader Rebuild မလုပ်ဘဲ Color သွင်းခြင်း
         function loadRealHumanModel(model, filename) {
-            while (modelWrapper.children.length > 0) {
-                modelWrapper.remove(modelWrapper.children[0]);
-            }
+            if (characterModel) scene.remove(characterModel);
 
             characterModel = model;
+            characterModel.position.set(0, 0, 0);
+            characterModel.scale.set(1, 1, 1);
+            characterModel.rotation.set(0, 0, 0);
+
             bones = {};
             boneMap = {};
             initialRotations = {};
@@ -568,6 +565,7 @@
 
             const activeShading = document.getElementById('sel-shading').value;
 
+            // 1. Gather all Bones and Meshes cleanly
             characterModel.traverse((child) => {
                 child.visible = true;
                 child.frustumCulled = false;
@@ -576,38 +574,26 @@
                     child.castShadow = true;
                     child.receiveShadow = true;
 
-                    if (child.geometry) {
-                        child.geometry.computeVertexNormals();
+                    // မူလ Material ကို မဖျက်ဘဲ Clay / Planar / Wireframe သို့ Color Update သာ ပြုလုပ်ခြင်း
+                    applyMaterialStyling(child, activeShading);
+
+                    if (child.isSkinnedMesh && child.skeleton && child.skeleton.bones) {
+                        child.skeleton.bones.forEach(b => {
+                            if (b && b.name) registerBone(b);
+                        });
                     }
-
-                    const isSkinned = Boolean(child.isSkinnedMesh);
-
-                    if (isSkinned && child.skeleton) {
-                        // 163-Bone Texture Buffer တည်ဆောက်ခြင်း
-                        if (typeof child.skeleton.computeBoneTexture === 'function' && !child.skeleton.boneTexture) {
-                            child.skeleton.computeBoneTexture();
-                        }
-
-                        if (child.skeleton.bones) {
-                            child.skeleton.bones.forEach(b => {
-                                if (b && b.name) registerBone(b);
-                            });
-                        }
-                    }
-
-                    child.material = createArtistMaterial(activeShading, isSkinned);
                 }
-
                 if (child.isBone || child.type === 'Bone') {
                     if (child.name) registerBone(child);
                 }
             });
 
-            modelWrapper.add(characterModel);
+            scene.add(characterModel);
 
-            // မော်ဒယ်အား လူတစ်ရပ်စာ 1.75m နှင့် ဗဟိုသို့ အလိုအလျောက် သတ်မှတ်ခြင်း
-            calibrateModelWrapper();
+            // 2. Camera နှင့် Pedestal အား မော်ဒယ်၏ အမြင့်ဆီသို့ အလိုအလျောက် ချိန်ညှိခြင်း
+            focusCameraOnModel();
 
+            // 3. Connect MakeHuman 163-Bones with Posing Controls
             mapAnatomicalBones();
             populateBoneDropdown();
 
@@ -616,9 +602,9 @@
             const rigBox = document.getElementById('rig-status-box');
 
             rigBox.innerHTML = `
-                <div style="color:#4ade80; font-weight:700;">● Rig Active: ${filename}</div>
+                <div style="color:#4ade80; font-weight:700;">● Rig Active: ${boneCount} Bones</div>
                 <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
-                    • တွေ့ရှိသော အရိုး: <b>${boneCount}</b> ခု | အဓိက အဆစ် ချိတ်ဆက်မှု: <b>${mappedCount} / ${ANATOMICAL_JOINTS.length}</b> ခု အသင့်ဖြစ်ပါပြီ
+                    • အဓိက အဆစ်များနှင့် ချိတ်ဆက်မှု: <b>${mappedCount} / ${ANATOMICAL_JOINTS.length}</b> အသင့်ဖြစ်ပါပြီ
                 </div>
             `;
 
@@ -634,72 +620,81 @@
             currentDeltas[b.name] = { x: 0, y: 0, z: 0 };
         }
 
-        // Bounding Box ချိန်ညှိမှုဖြင့် မော်ဒယ်အား ကင်မရာရှေ့သို့ အတိအကျ ချိန်ပေးသည့် စနစ်
-        function calibrateModelWrapper() {
-            if (!modelWrapper || modelWrapper.children.length === 0) return;
+        // Material Binding ကို မပျက်စီးစေဘဲ Shading အရောင်သွင်းသည့် စနစ်
+        function applyMaterialStyling(mesh, mode) {
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach(mat => {
+                if (!mat) return;
+                mat.side = THREE.DoubleSide;
+                mat.transparent = false;
+                mat.opacity = 1.0;
+                mat.wireframe = (mode === 'wireframe');
 
-            modelWrapper.position.set(0, 0, 0);
-            modelWrapper.scale.set(1, 1, 1);
-            modelWrapper.rotation.set(0, 0, 0);
-            modelWrapper.updateMatrixWorld(true);
-
-            const box = new THREE.Box3().setFromObject(modelWrapper);
-            if (box.isEmpty()) return;
-
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-
-            const targetHeight = 1.75;
-            const scaleFactor = targetHeight / (maxDim > 0 ? maxDim : 1);
-            modelWrapper.scale.setScalar(scaleFactor);
-            modelWrapper.updateMatrixWorld(true);
-
-            const finalBox = new THREE.Box3().setFromObject(modelWrapper);
-            const finalCenter = finalBox.getCenter(new THREE.Vector3());
-
-            modelWrapper.position.x = -finalCenter.x;
-            modelWrapper.position.z = -finalCenter.z;
-            modelWrapper.position.y = -finalBox.min.y;
-
-            camera.position.set(0, 1.25, 2.7);
-            controls.target.set(0, 0.9, 0);
-            camera.lookAt(0, 0.9, 0);
-            controls.update();
-        }
-
-        function focusCameraOnModel() {
-            calibrateModelWrapper();
-        }
-
-        function createArtistMaterial(mode, isSkinned) {
-            const params = {
-                skinning: isSkinned,
-                side: THREE.DoubleSide,
-                roughness: 0.85,
-                metalness: 0.05
-            };
-
-            if (mode === 'clay') {
-                return new THREE.MeshStandardMaterial({ ...params, color: 0xd6cbb8 });
-            } else if (mode === 'planar') {
-                return new THREE.MeshStandardMaterial({ ...params, color: 0xd2d2dc, flatShading: true });
-            } else if (mode === 'ecorche') {
-                return new THREE.MeshStandardMaterial({ ...params, color: 0x9b3838, roughness: 0.65 });
-            } else if (mode === 'wireframe') {
-                return new THREE.MeshBasicMaterial({ color: 0x6366f1, wireframe: true, skinning: isSkinned });
-            }
-            return new THREE.MeshStandardMaterial({ ...params, color: 0xcccccc });
+                if (mode === 'clay') {
+                    mat.color.setHex(0xd6cbb8);
+                    if ('roughness' in mat) mat.roughness = 0.82;
+                } else if (mode === 'planar') {
+                    mat.color.setHex(0xd2d2dc);
+                    mat.flatShading = true;
+                    mat.needsUpdate = true;
+                } else if (mode === 'ecorche') {
+                    mat.color.setHex(0x9b3838);
+                    if ('roughness' in mat) mat.roughness = 0.65;
+                } else if (mode === 'wireframe') {
+                    mat.color.setHex(0x6366f1);
+                }
+            });
         }
 
         function applyShadingMode(mode) {
             if (!characterModel) return;
             characterModel.traverse((child) => {
                 if (child.isMesh) {
-                    child.material = createArtistMaterial(mode, Boolean(child.isSkinnedMesh));
+                    applyMaterialStyling(child, mode);
                 }
             });
         }
 
+        // Zero-Distortion Camera & Pedestal Auto-Framing
+        function focusCameraOnModel() {
+            if (!characterModel) return;
+
+            characterModel.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(characterModel);
+            if (box.isEmpty()) return;
+
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z, 0.1);
+
+            // Pedestal နှင့် Grid အား မော်ဒယ် ခြေထောက်အောက်တွင် အံဝင်ခွင်ကျ ထားရှိခြင်း
+            const groundY = box.min.y;
+            floorPedestal.position.set(center.x, groundY - 0.01, center.z);
+            floorPedestal.scale.set(maxDim * 0.45, 1, maxDim * 0.45);
+
+            floorGrid.position.set(center.x, groundY, center.z);
+            floorGrid.scale.set(maxDim * 0.4, 1, maxDim * 0.4);
+
+            const fov = camera.fov * (Math.PI / 180);
+            const cameraDist = (maxDim / 2) / Math.tan(fov / 2) * 1.45;
+
+            camera.near = Math.max(maxDim / 500, 0.01);
+            camera.far = Math.max(maxDim * 100, 2000);
+            camera.updateProjectionMatrix();
+
+            camera.position.set(center.x, center.y + (size.y * 0.08), center.z + cameraDist);
+            controls.target.copy(center);
+            camera.lookAt(center);
+            controls.update();
+
+            // Lights များကို မော်ဒယ်အရွယ်အစားအလိုက် လိုက်လျောညီထွေ ရွှေ့ပေးခြင်း
+            const lightDist = Math.max(maxDim * 1.8, 3);
+            keyLight.position.set(center.x + lightDist, center.y + lightDist, center.z + lightDist);
+            fillLight.position.set(center.x - lightDist, center.y + (lightDist * 0.5), center.z - lightDist);
+            rimLight.position.set(center.x, center.y + lightDist, center.z - lightDist);
+        }
+
+        // MakeHuman 163-Bones Precise Resolver
         function mapAnatomicalBones() {
             boneMap = {};
             const allBoneNames = Object.keys(bones);
@@ -798,7 +793,7 @@
             document.getElementById('val-rz').innerText = dz + '°';
         }
 
-        // Scene Hierarchy Update ဖြင့် အရိုးလှုပ်ရှားမှုကို အချိန်နှင့်တစ်ပြေးညီ ပုံဖော်ခြင်း
+        // Direct Local Transform + Synchronized Matrix Hierarchy
         function applyRotationToBoneName(boneName, dx, dy, dz) {
             const b = bones[boneName];
             if (!b || !b.userData.restQuat) return;
@@ -816,16 +811,13 @@
             b.quaternion.copy(b.userData.restQuat).multiply(deltaQuat);
             b.updateMatrix();
 
-            // matrixWorld အား အဆင့်ဆင့် အသစ်ပြန်တွက်စေခြင်း
-            scene.updateMatrixWorld(true);
-
-            if (characterModel) {
-                characterModel.traverse((child) => {
-                    if (child.isSkinnedMesh && child.skeleton) {
-                        child.skeleton.update();
-                    }
-                });
-            }
+            // World Matrix အား ဦးစွာ တွက်ချက်စေပြီးမှ Skeleton Buffer ကို အသစ်ပြင်ဆင်ခြင်း
+            characterModel.updateMatrixWorld(true);
+            characterModel.traverse((child) => {
+                if (child.isSkinnedMesh && child.skeleton) {
+                    child.skeleton.update();
+                }
+            });
         }
 
         function resetCurrentBone() {
@@ -847,8 +839,8 @@
                     currentDeltas[bName] = { x: 0, y: 0, z: 0 };
                 }
             });
-            scene.updateMatrixWorld(true);
             if (characterModel) {
+                characterModel.updateMatrixWorld(true);
                 characterModel.traverse((child) => {
                     if (child.isSkinnedMesh && child.skeleton) child.skeleton.update();
                 });
@@ -856,6 +848,7 @@
             loadBoneRotations();
         }
 
+        // Posing Presets Calibrated for MakeHuman Skeleton
         function applyPresetPose(pose) {
             resetAllBonesToRestPose();
 
@@ -865,15 +858,15 @@
             };
 
             if (pose === 'contrapposto') {
-                applyJointDelta('pelvis', 0, 0, -6);
-                applyJointDelta('waist', 3, 5, 6);
-                applyJointDelta('chest', -2, -4, 3);
+                applyJointDelta('pelvis', 0, 0, -5);
+                applyJointDelta('waist', 3, 5, 5);
+                applyJointDelta('chest', -2, -4, 2);
                 applyJointDelta('head', 4, -14, 2);
-                applyJointDelta('upperleg_r', -6, 0, 3);
-                applyJointDelta('upperleg_l', 26, -6, -8);
-                applyJointDelta('lowerleg_l', -34, 0, 0);
-                applyJointDelta('upperarm_r', 12, 0, 16);
-                applyJointDelta('lowerarm_r', 0, 0, 24);
+                applyJointDelta('upperleg_r', -6, 0, 4);
+                applyJointDelta('upperleg_l', 25, -5, -8);
+                applyJointDelta('lowerleg_l', -35, 0, 0);
+                applyJointDelta('upperarm_r', 12, 0, 15);
+                applyJointDelta('lowerarm_r', 0, 0, 25);
                 applyJointDelta('upperarm_l', 6, 0, -10);
             } else if (pose === 'sitting') {
                 applyJointDelta('upperleg_l', -85, 4, -6);
@@ -924,6 +917,16 @@
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
+
+            // ပုံမှန် Frame တိုင်းတွင် Skeleton Matrix စဉ်ဆက်မပြတ် Sync ဖြစ်နေစေရန် ခေါ်ယူခြင်း
+            if (characterModel) {
+                characterModel.traverse((child) => {
+                    if (child.isSkinnedMesh && child.skeleton) {
+                        child.skeleton.update();
+                    }
+                });
+            }
+
             renderer.render(scene, camera);
         }
 
