@@ -1,6429 +1,922 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-
-<meta name="viewport"
-
-      content="width=device-width,
-
-               initial-scale=1.0,
-
-               maximum-scale=1.0,
-
-               user-scalable=no">
-
-<title>3D Anatomy Studio</title>
-
-<style>
-
-*{
-
-    box-sizing:border-box;
-
-    margin:0;
-
-    padding:0;
-
-    user-select:none;
-
-    -webkit-tap-highlight-color:transparent;
-
-}
-
-html,
-
-body{
-
-    width:100%;
-
-    height:100%;
-
-    overflow:hidden;
-
-}
-
-body{
-
-    background:#0c0c10;
-
-    color:#e2e8f0;
-
-    font-family:
-
-        -apple-system,
-
-        BlinkMacSystemFont,
-
-        "Segoe UI",
-
-        Roboto,
-
-        sans-serif;
-
-}
-
-#canvas-container{
-
-    position:absolute;
-
-    inset:0;
-
-    z-index:1;
-
-}
-
-#ui-toggle-btn{
-
-    position:absolute;
-
-    top:14px;
-
-    right:14px;
-
-    z-index:50;
-
-    background:rgba(28,28,38,.92);
-
-    backdrop-filter:blur(10px);
-
-    border:1px solid rgba(255,255,255,.2);
-
-    color:#fff;
-
-    padding:8px 14px;
-
-    border-radius:20px;
-
-    font-size:12px;
-
-    font-weight:600;
-
-    cursor:pointer;
-
-}
-
-#ui-panel{
-
-    position:absolute;
-
-    top:14px;
-
-    left:14px;
-
-    width:340px;
-
-    max-height:92vh;
-
-    background:rgba(18,18,24,.90);
-
-    backdrop-filter:blur(18px);
-
-    border:1px solid rgba(255,255,255,.12);
-
-    border-radius:14px;
-
-    padding:14px;
-
-    overflow-y:auto;
-
-    z-index:20;
-
-    box-shadow:
-
-        0 16px 40px rgba(0,0,0,.6);
-
-    transition:
-
-        transform .3s cubic-bezier(.2,.8,.2,1),
-
-        opacity .3s ease;
-
-}
-
-#ui-panel.hidden{
-
-    transform:translateX(-120%);
-
-    opacity:0;
-
-    pointer-events:none;
-
-}
-
-@media(max-width:768px){
-
-    #ui-panel{
-
-        top:auto;
-
-        bottom:0;
-
-        left:0;
-
-        width:100%;
-
-        max-height:56vh;
-
-        border-radius:18px 18px 0 0;
-
-        border-bottom:none;
-
-    }
-
-    #ui-panel.hidden{
-
-        transform:translateY(110%);
-
-    }
-
-}
-
-h2{
-
-    font-size:14px;
-
-    font-weight:700;
-
-    color:#fff;
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:space-between;
-
-}
-
-.status-badge{
-
-    font-size:10px;
-
-    padding:2px 7px;
-
-    border-radius:10px;
-
-    font-weight:500;
-
-    background:#064e3b;
-
-    color:#6ee7b7;
-
-}
-
-.status-badge.error{
-
-    background:#4c1d1d;
-
-    color:#f87171;
-
-}
-
-.tabs{
-
-    display:flex;
-
-    gap:4px;
-
-    margin:10px 0;
-
-    background:#14141c;
-
-    padding:3px;
-
-    border-radius:8px;
-
-}
-
-.tab{
-
-    flex:1;
-
-    text-align:center;
-
-    padding:7px 0;
-
-    font-size:11px;
-
-    border-radius:6px;
-
-    cursor:pointer;
-
-    color:#8a8a9a;
-
-}
-
-.tab.active{
-
-    background:#262638;
-
-    color:#fff;
-
-    font-weight:600;
-
-}
-
-.tab-content{
-
-    display:none;
-
-}
-
-.tab-content.active{
-
-    display:block;
-
-}
-
-.section-title{
-
-    font-size:10px;
-
-    text-transform:uppercase;
-
-    letter-spacing:1px;
-
-    color:#64748b;
-
-    margin:12px 0 6px;
-
-    border-bottom:1px solid #232330;
-
-    padding-bottom:3px;
-
-}
-
-.control-group{
-
-    margin-bottom:8px;
-
-    display:flex;
-
-    flex-direction:column;
-
-    gap:4px;
-
-}
-
-.grid-2{
-
-    display:grid;
-
-    grid-template-columns:
-
-        1fr 1fr;
-
-    gap:8px;
-
-}
-
-label{
-
-    font-size:11px;
-
-    color:#94a3b8;
-
-    display:flex;
-
-    justify-content:space-between;
-
-}
-
-select,
-
-input[type=range],
-
-button{
-
-    background:#1b1b26;
-
-    color:#f8fafc;
-
-    border:1px solid #333346;
-
-    border-radius:6px;
-
-    padding:7px 8px;
-
-    font-size:12px;
-
-    outline:none;
-
-}
-
-input[type=range]{
-
-    -webkit-appearance:none;
-
-    height:4px;
-
-    background:#2d2d3f;
-
-    border-radius:2px;
-
-    padding:0;
-
-}
-
-input[type=range]::-webkit-slider-thumb{
-
-    -webkit-appearance:none;
-
-    width:14px;
-
-    height:14px;
-
-    border-radius:50%;
-
-    background:#6366f1;
-
-    cursor:pointer;
-
-}
-
-button{
-
-    cursor:pointer;
-
-    background:#252536;
-
-    font-weight:500;
-
-}
-
-button.primary{
-
-    background:#4f46e5;
-
-    border-color:#6366f1;
-
-}
-
-button:disabled{
-
-    opacity:.4;
-
-    cursor:not-allowed;
-
-}
-
-#rig-status-box{
-
-    font-size:11px;
-
-    padding:8px 10px;
-
-    border-radius:6px;
-
-    background:#181824;
-
-    border:1px solid #2b2b3d;
-
-    margin-bottom:8px;
-
-    line-height:1.4;
-
-}
-
-#status-toast{
-
-    position:absolute;
-
-    bottom:15px;
-
-    right:15px;
-
-    max-width:420px;
-
-    background:rgba(20,20,28,.95);
-
-    border:1px solid rgba(255,255,255,.2);
-
-    padding:8px 14px;
-
-    border-radius:8px;
-
-    font-size:11px;
-
-    color:#cbd5e1;
-
-    z-index:100;
-
-    box-shadow:
-
-        0 4px 15px rgba(0,0,0,.5);
-
-}
-
-.error-text{
-
-    color:#f87171;
-
-}
-
-.success-text{
-
-    color:#4ade80;
-
-}
-
-</style>
-
-<!-- THREE.JS -->
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/ColladaLoader.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Anatomy Studio</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { background: #0c0c10; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        #ui-toggle-btn {
+            position: absolute; top: 14px; right: 14px; z-index: 50;
+            background: rgba(28, 28, 38, 0.9); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2); color: #fff;
+            padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        #ui-panel {
+            position: absolute; top: 14px; left: 14px; width: 340px; max-height: 92vh;
+            background: rgba(18, 18, 24, 0.88); backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px;
+            padding: 14px; overflow-y: auto; z-index: 20; box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+        }
+        #ui-panel.hidden { transform: translateX(-120%); opacity: 0; pointer-events: none; }
+
+        @media (max-width: 768px) {
+            #ui-panel {
+                top: auto; bottom: 0; left: 0; width: 100%; max-height: 52vh;
+                border-radius: 18px 18px 0 0; border-bottom: none;
+            }
+            #ui-panel.hidden { transform: translateY(110%); }
+        }
+
+        h2 { font-size: 14px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: space-between; }
+        .status-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 500; background: #064e3b; color: #6ee7b7; }
+        .status-badge.error { background: #4c1d1d; color: #f87171; }
+
+        .tabs { display: flex; gap: 4px; margin: 10px 0; background: #14141c; padding: 3px; border-radius: 8px; }
+        .tab { flex: 1; text-align: center; padding: 6px 0; font-size: 11px; border-radius: 6px; cursor: pointer; color: #8a8a9a; }
+        .tab.active { background: #262638; color: #fff; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin: 12px 0 6px; border-bottom: 1px solid #232330; padding-bottom: 3px; }
+        .control-group { margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        
+        label { font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; }
+        select, input[type="range"], button {
+            background: #1b1b26; color: #f8fafc; border: 1px solid #333346;
+            border-radius: 6px; padding: 6px 8px; font-size: 12px; outline: none;
+        }
+        input[type="range"] { -webkit-appearance: none; height: 4px; background: #2d2d3f; border-radius: 2px; padding: 0; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #6366f1; cursor: pointer; }
+        button { cursor: pointer; background: #252536; font-weight: 500; }
+        button.primary { background: #4f46e5; border-color: #6366f1; }
+        
+        #rig-status-box {
+            font-size: 11px; padding: 8px 10px; border-radius: 6px;
+            background: #181824; border: 1px solid #2b2b3d; margin-bottom: 8px; line-height: 1.4;
+        }
+
+        #status-toast {
+            position: absolute; bottom: 15px; right: 15px;
+            background: rgba(20, 20, 28, 0.95); border: 1px solid rgba(255,255,255,0.2);
+            padding: 8px 14px; border-radius: 8px; font-size: 11px; color: #cbd5e1;
+            z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+    </style>
+    <!-- Three.js + OrbitControls + ColladaLoader + GLTFLoader + JSZip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/ColladaLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-
 <body>
+    <button id="ui-toggle-btn" onclick="toggleUI()">👁️ Hide UI</button>
+    <div id="status-toast">Ready</div>
 
-<button id="ui-toggle-btn"
+    <div id="canvas-container"></div>
 
-        onclick="toggleUI()">
+    <div id="ui-panel">
+        <h2>
+            Anatomy Studio 3D
+            <span id="zip-badge" class="status-badge">Connecting...</span>
+        </h2>
 
-    👁️ Hide UI
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab(event, 'tab-model')">Model</div>
+            <div class="tab" onclick="switchTab(event, 'tab-pose')">Posing</div>
+            <div class="tab" onclick="switchTab(event, 'tab-light')">Lighting</div>
+            <div class="tab" onclick="switchTab(event, 'tab-file')">Data</div>
+        </div>
 
-</button>
+        <!-- TAB 1: MODEL SELECTION -->
+        <div id="tab-model" class="tab-content active">
+            <div class="section-title">Anatomy Subject</div>
+            <div class="control-group">
+                <label>Ethnic Archetype (လူမျိုး):</label>
+                <select id="sel-ethnic" onchange="onModelConfigChange()">
+                    <option value="asian" selected>Asian (အာရှ)</option>
+                    <option value="caucasian">Caucasian (အနောက်တိုင်း)</option>
+                    <option value="african">African (အာဖရိက)</option>
+                </select>
+            </div>
+            <div class="grid-2">
+                <div class="control-group">
+                    <label>Gender (ကျား/မ):</label>
+                    <select id="sel-gender" onchange="onModelConfigChange()">
+                        <option value="male" selected>Male</option>
+                        <option value="female">Female</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Age (အသက်အရွယ်):</label>
+                    <select id="sel-age" onchange="onModelConfigChange()">
+                        <option value="adult" selected>Adult (~30)</option>
+                        <option value="teen">Teen (13-16)</option>
+                        <option value="child">Child (5-7)</option>
+                        <option value="toddler">Toddler (1-2)</option>
+                        <option value="elderly">Elderly (~70)</option>
+                    </select>
+                </div>
+            </div>
 
-<div id="status-toast">
+            <div class="control-group" id="zip-direct-group" style="margin-top: 6px;">
+                <label>Direct Model Select (ဖိုင်တိုက်ရိုက်ရွေးရန်):</label>
+                <select id="sel-zip-file" onchange="onDirectFilePicked(this.value)"></select>
+            </div>
 
-    Initializing...
+            <div class="section-title">Shading Mode (အလင်းအမှောင်)</div>
+            <div class="control-group">
+                <select id="sel-shading" onchange="applyShadingMode(this.value)">
+                    <option value="clay" selected>Smooth Clay (ပလာစတာစတိုင်)</option>
+                    <option value="planar">Planar / Asaro (Planes of Light)</option>
+                    <option value="ecorche">Ecorché (ကြွက်သားလွှာစတိုင်)</option>
+                    <option value="wireframe">Wireframe</option>
+                </select>
+            </div>
 
-</div>
+            <button onclick="focusCameraOnModel()" style="margin-top: 8px; width: 100%;">🎯 Center & Focus View</button>
+        </div>
 
-<div id="canvas-container"></div>
+        <!-- TAB 2: POSING -->
+        <div id="tab-pose" class="tab-content">
+            <div id="rig-status-box">● Model Inactive</div>
 
-<!-- ========================================================= -->
+            <div class="section-title">Everyday Movement Presets</div>
+            <div class="control-group">
+                <select id="sel-pose" onchange="applyPresetPose(this.value)">
+                    <option value="neutral" selected>Neutral A-Pose (မူလ မတ်တပ်)</option>
+                    <option value="contrapposto">Contrapposto (ဂန္ထဝင် အလေးပေးရပ်ဟန်)</option>
+                    <option value="sitting">Sitting (ကုလားထိုင် ထိုင်ဟန်)</option>
+                    <option value="walking">Walking / Stride (လမ်းလျှောက်ဟန်)</option>
+                    <option value="folded_arms">Folded Arms (လက်ပိုက်ရပ်ဟန်)</option>
+                    <option value="thinker">The Thinker (စဉ်းစားတွေးတောဟန်)</option>
+                </select>
+            </div>
 
-<!-- UI -->
+            <div class="section-title">Fine-tune Joint Move (အဆစ်လှည့်ရန်)</div>
+            <div class="control-group">
+                <label>Select Joint (လှုပ်မည့်နေရာ):</label>
+                <select id="sel-bone" onchange="loadBoneRotations()"></select>
+            </div>
+            <div class="control-group">
+                <label>Rotate X (ရှေ့/နောက် ကွေး): <span id="val-rx">0°</span></label>
+                <input type="range" id="rot-x" min="-110" max="110" value="0" oninput="updateBoneRotation()">
+            </div>
+            <div class="control-group">
+                <label>Rotate Y (ဘယ်/ညာ လှည့်): <span id="val-ry">0°</span></label>
+                <input type="range" id="rot-y" min="-110" max="110" value="0" oninput="updateBoneRotation()">
+            </div>
+            <div class="control-group">
+                <label>Rotate Z (ဘေးဘက် စောင်း): <span id="val-rz">0°</span></label>
+                <input type="range" id="rot-z" min="-110" max="110" value="0" oninput="updateBoneRotation()">
+            </div>
+            <div class="grid-2" style="margin-top: 6px;">
+                <button onclick="resetCurrentBone()">Reset Selected</button>
+                <button onclick="resetAllBonesToRestPose()">Reset All</button>
+            </div>
+        </div>
 
-<!-- ========================================================= -->
+        <!-- TAB 3: LIGHTING -->
+        <div id="tab-light" class="tab-content">
+            <div class="section-title">Studio Preset</div>
+            <div class="control-group">
+                <select id="sel-light-preset" onchange="applyLightingPreset(this.value)">
+                    <option value="studio" selected>3-Point Studio (Default)</option>
+                    <option value="daylight">Daylight / Natural Sun</option>
+                    <option value="stage">Stage / Dramatic Rim</option>
+                </select>
+            </div>
+            <div class="section-title">Key Light (အဓိကမီး)</div>
+            <div class="control-group">
+                <label>Orbit Angle:</label>
+                <input type="range" id="key-angle" min="0" max="360" value="45" oninput="updateLights()">
+            </div>
+            <div class="control-group">
+                <label>Intensity:</label>
+                <input type="range" id="key-intensity" min="0" max="3.5" step="0.1" value="1.5" oninput="updateLights()">
+            </div>
+            <div class="section-title">Rim Light (အနားသတ်မီး)</div>
+            <div class="control-group">
+                <label>Intensity:</label>
+                <input type="range" id="rim-intensity" min="0" max="4" step="0.1" value="2.2" oninput="updateLights()">
+            </div>
+            <button class="primary" style="margin-top: 10px; width: 100%;" onclick="resetLights()">Reset Lighting</button>
+        </div>
 
-<div id="ui-panel">
-
-<h2>
-
-    Anatomy Studio 3D
-
-    <span id="zip-badge"
-
-          class="status-badge">
-
-        Starting...
-
-    </span>
-
-</h2>
-
-<div class="tabs">
-
-    <div class="tab active"
-
-         onclick="switchTab(event,'tab-model')">
-
-        Model
-
+        <!-- TAB 4: DATA -->
+        <div id="tab-file" class="tab-content">
+            <div class="section-title">ZIP / Direct File Upload</div>
+            <p id="zip-msg" style="font-size: 11px; color: #94a3b8; line-height: 1.4; margin-bottom: 8px;">
+                <code>models.zip</code> သို့မဟုတ် <code>.dae</code> / <code>.glb</code> ဖိုင်ကို ရွေးချယ်တင်သွင်းနိုင်ပါသည်-
+            </p>
+            <input type="file" id="zip-input" accept=".zip,.dae,.glb,.gltf" multiple onchange="onFileUpload(event)" style="width: 100%;">
+            <div id="zip-file-list" style="margin-top: 10px; font-size: 10px; color: #64748b; max-height: 120px; overflow-y: auto;"></div>
+        </div>
     </div>
 
-    <div class="tab"
-
-         onclick="switchTab(event,'tab-pose')">
-
-        Posing
-
-    </div>
-
-    <div class="tab"
-
-         onclick="switchTab(event,'tab-light')">
-
-        Lighting
-
-    </div>
-
-    <div class="tab"
-
-         onclick="switchTab(event,'tab-file')">
-
-        Data
-
-    </div>
-
-</div>
-
-<!-- ========================================================= -->
-
-<!-- MODEL -->
-
-<!-- ========================================================= -->
-
-<div id="tab-model"
-
-     class="tab-content active">
-
-<div class="section-title">
-
-    Anatomy Subject
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Ethnic Archetype
-
-</label>
-
-<select id="sel-ethnic"
-
-        onchange="onModelConfigChange()">
-
-<option value="asian">
-
-    Asian
-
-</option>
-
-<option value="caucasian">
-
-    Caucasian
-
-</option>
-
-<option value="african">
-
-    African
-
-</option>
-
-</select>
-
-</div>
-
-<div class="grid-2">
-
-<div class="control-group">
-
-<label>
-
-    Gender
-
-</label>
-
-<select id="sel-gender"
-
-        onchange="onModelConfigChange()">
-
-<option value="male">
-
-    Male
-
-</option>
-
-<option value="female">
-
-    Female
-
-</option>
-
-</select>
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Age
-
-</label>
-
-<select id="sel-age"
-
-        onchange="onModelConfigChange()">
-
-<option value="adult">
-
-    Adult
-
-</option>
-
-<option value="teen">
-
-    Teen
-
-</option>
-
-<option value="child">
-
-    Child
-
-</option>
-
-<option value="toddler">
-
-    Toddler
-
-</option>
-
-<option value="elderly">
-
-    Elderly
-
-</option>
-
-</select>
-
-</div>
-
-</div>
-
-<div class="control-group"
-
-     id="zip-direct-group">
-
-<label>
-
-    Direct Model Select
-
-</label>
-
-<select id="sel-zip-file"
-
-        onchange="onDirectFilePicked(this.value)">
-
-</select>
-
-</div>
-
-<div class="section-title">
-
-    Shading
-
-</div>
-
-<div class="control-group">
-
-<select id="sel-shading"
-
-        onchange="applyShadingMode(this.value)">
-
-<option value="clay">
-
-    Smooth Clay
-
-</option>
-
-<option value="planar">
-
-    Planar / Asaro
-
-</option>
-
-<option value="ecorche">
-
-    Ecorché
-
-</option>
-
-<option value="wireframe">
-
-    Wireframe
-
-</option>
-
-</select>
-
-</div>
-
-<button onclick="focusCameraOnModel()"
-
-        style="margin-top:8px;width:100%;">
-
-    🎯 Center & Focus View
-
-</button>
-
-</div>
-
-<!-- ========================================================= -->
-
-<!-- POSING -->
-
-<!-- ========================================================= -->
-
-<div id="tab-pose"
-
-     class="tab-content">
-
-<div id="rig-status-box">
-
-    ● Model Inactive
-
-</div>
-
-<div class="section-title">
-
-    Everyday Movement Presets
-
-</div>
-
-<div class="control-group">
-
-<select id="sel-pose"
-
-        onchange="applyPresetPose(this.value)">
-
-<option value="neutral">
-
-    Neutral A-Pose
-
-</option>
-
-<option value="contrapposto">
-
-    Contrapposto
-
-</option>
-
-<option value="sitting">
-
-    Sitting
-
-</option>
-
-<option value="walking">
-
-    Walking / Stride
-
-</option>
-
-<option value="folded_arms">
-
-    Folded Arms
-
-</option>
-
-<option value="thinker">
-
-    The Thinker
-
-</option>
-
-</select>
-
-</div>
-
-<div class="section-title">
-
-    Fine-tune Joint Move
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Select Joint
-
-</label>
-
-<select id="sel-bone"
-
-        onchange="loadBoneRotations()">
-
-</select>
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Rotate X
-
-    <span id="val-rx">
-
-        0°
-
-    </span>
-
-</label>
-
-<input type="range"
-
-       id="rot-x"
-
-       min="-180"
-
-       max="180"
-
-       value="0"
-
-       oninput="updateBoneRotation()">
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Rotate Y
-
-    <span id="val-ry">
-
-        0°
-
-    </span>
-
-</label>
-
-<input type="range"
-
-       id="rot-y"
-
-       min="-180"
-
-       max="180"
-
-       value="0"
-
-       oninput="updateBoneRotation()">
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Rotate Z
-
-    <span id="val-rz">
-
-        0°
-
-    </span>
-
-</label>
-
-<input type="range"
-
-       id="rot-z"
-
-       min="-180"
-
-       max="180"
-
-       value="0"
-
-       oninput="updateBoneRotation()">
-
-</div>
-
-<div class="grid-2"
-
-     style="margin-top:6px;">
-
-<button onclick="resetCurrentBone()">
-
-    Reset Selected
-
-</button>
-
-<button onclick="resetAllBonesToRestPose()">
-
-    Reset All
-
-</button>
-
-</div>
-
-</div>
-
-<!-- ========================================================= -->
-
-<!-- LIGHTING -->
-
-<!-- ========================================================= -->
-
-<div id="tab-light"
-
-     class="tab-content">
-
-<div class="section-title">
-
-    Studio Preset
-
-</div>
-
-<div class="control-group">
-
-<select id="sel-light-preset"
-
-        onchange="applyLightingPreset(this.value)">
-
-<option value="studio">
-
-    3-Point Studio
-
-</option>
-
-<option value="daylight">
-
-    Daylight / Natural Sun
-
-</option>
-
-<option value="stage">
-
-    Stage / Dramatic Rim
-
-</option>
-
-</select>
-
-</div>
-
-<div class="section-title">
-
-    Key Light
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Orbit Angle
-
-</label>
-
-<input type="range"
-
-       id="key-angle"
-
-       min="0"
-
-       max="360"
-
-       value="45"
-
-       oninput="updateLights()">
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Intensity
-
-</label>
-
-<input type="range"
-
-       id="key-intensity"
-
-       min="0"
-
-       max="3.5"
-
-       step="0.1"
-
-       value="1.5"
-
-       oninput="updateLights()">
-
-</div>
-
-<div class="section-title">
-
-    Rim Light
-
-</div>
-
-<div class="control-group">
-
-<label>
-
-    Intensity
-
-</label>
-
-<input type="range"
-
-       id="rim-intensity"
-
-       min="0"
-
-       max="4"
-
-       step="0.1"
-
-       value="2.2"
-
-       oninput="updateLights()">
-
-</div>
-
-<button class="primary"
-
-        style="margin-top:10px;width:100%;"
-
-        onclick="resetLights()">
-
-Reset Lighting
-
-</button>
-
-</div>
-
-<!-- ========================================================= -->
-
-<!-- DATA -->
-
-<!-- ========================================================= -->
-
-<div id="tab-file"
-
-     class="tab-content">
-
-<div class="section-title">
-
-    ZIP / Direct File Upload
-
-</div>
-
-<p id="zip-msg"
-
-   style="
-
-        font-size:11px;
-
-        color:#94a3b8;
-
-        line-height:1.4;
-
-        margin-bottom:8px;
-
-   ">
-
-    <code>models.zip</code>,
-
-    <code>.dae</code>,
-
-    <code>.glb</code>
-
-    သို့မဟုတ်
-
-    <code>.gltf</code>
-
-    ဖိုင်ကို ရွေးနိုင်ပါတယ်။
-
-</p>
-
-<input type="file"
-
-       id="zip-input"
-
-       accept=".zip,.dae,.glb,.gltf"
-
-       multiple
-
-       onchange="onFileUpload(event)"
-
-       style="width:100%;">
-
-<div id="zip-file-list"
-
-     style="
-
-        margin-top:10px;
-
-        font-size:10px;
-
-        color:#64748b;
-
-        max-height:120px;
-
-        overflow-y:auto;
-
-     ">
-
-</div>
-
-</div>
-
-</div>
-
-<script>
-
-/* ============================================================
-
-   GLOBAL STATE
-
-============================================================ */
-
-let scene;
-
-let camera;
-
-let renderer;
-
-let controls;
-
-let modelWrapper;
-
-let characterModel = null;
-
-let floorPedestal;
-
-let floorGrid;
-
-let keyLight;
-
-let fillLight;
-
-let rimLight;
-
-let ambientLight;
-
-let colladaLoader;
-
-let gltfLoader;
-
-let loadedZip = null;
-
-let bones = {};
-
-let boneMap = {};
-
-let initialRotations = {};
-
-let currentDeltas = {};
-
-let isUIHidden = false;
-
-let loadingToken = 0;
-
-/* ============================================================
-
-   ANATOMICAL JOINTS
-
-============================================================ */
-
-const ANATOMICAL_JOINTS = [
-
-{
-
-    key:'head',
-
-    label:'Head',
-
-    aliases:[
-
-        'head',
-
-        'head01',
-
-        'head02',
-
-        'skull'
-
-    ]
-
-},
-
-{
-
-    key:'neck',
-
-    label:'Neck',
-
-    aliases:[
-
-        'neck',
-
-        'neck01',
-
-        'neck02',
-
-        'neck03'
-
-    ]
-
-},
-
-{
-
-    key:'chest',
-
-    label:'Chest',
-
-    aliases:[
-
-        'chest',
-
-        'spine03',
-
-        'spine04',
-
-        'spine05',
-
-        'upperchest'
-
-    ]
-
-},
-
-{
-
-    key:'waist',
-
-    label:'Waist',
-
-    aliases:[
-
-        'waist',
-
-        'spine',
-
-        'spine01',
-
-        'spine02',
-
-        'abdomen'
-
-    ]
-
-},
-
-{
-
-    key:'pelvis',
-
-    label:'Pelvis',
-
-    aliases:[
-
-        'pelvis',
-
-        'hips',
-
-        'hip',
-
-        'root'
-
-    ]
-
-},
-
-{
-
-    key:'upperarm_l',
-
-    label:'Left Upper Arm',
-
-    aliases:[
-
-        'upperarm_l',
-
-        'upperarm01_l',
-
-        'upperarm02_l',
-
-        'upperarm.L',
-
-        'upperarm01.L',
-
-        'upperarm02.L',
-
-        'leftupperarm'
-
-    ]
-
-},
-
-{
-
-    key:'lowerarm_l',
-
-    label:'Left Forearm',
-
-    aliases:[
-
-        'lowerarm_l',
-
-        'lowerarm01_l',
-
-        'lowerarm02_l',
-
-        'forearm_l',
-
-        'forearm.L',
-
-        'forearm01.L',
-
-        'leftforearm'
-
-    ]
-
-},
-
-{
-
-    key:'upperarm_r',
-
-    label:'Right Upper Arm',
-
-    aliases:[
-
-        'upperarm_r',
-
-        'upperarm01_r',
-
-        'upperarm02_r',
-
-        'upperarm.R',
-
-        'upperarm01.R',
-
-        'upperarm02.R',
-
-        'rightupperarm'
-
-    ]
-
-},
-
-{
-
-    key:'lowerarm_r',
-
-    label:'Right Forearm',
-
-    aliases:[
-
-        'lowerarm_r',
-
-        'lowerarm01_r',
-
-        'lowerarm02_r',
-
-        'forearm_r',
-
-        'forearm.R',
-
-        'forearm01.R',
-
-        'rightforearm'
-
-    ]
-
-},
-
-{
-
-    key:'upperleg_l',
-
-    label:'Left Thigh',
-
-    aliases:[
-
-        'thigh_l',
-
-        'thigh01_l',
-
-        'thigh02_l',
-
-        'thigh.L',
-
-        'thigh01.L',
-
-        'leftthigh'
-
-    ]
-
-},
-
-{
-
-    key:'lowerleg_l',
-
-    label:'Left Knee / Shin',
-
-    aliases:[
-
-        'calf_l',
-
-        'calf01_l',
-
-        'calf02_l',
-
-        'shin_l',
-
-        'shin.L',
-
-        'calf.L',
-
-        'leftshin'
-
-    ]
-
-},
-
-{
-
-    key:'upperleg_r',
-
-    label:'Right Thigh',
-
-    aliases:[
-
-        'thigh_r',
-
-        'thigh01_r',
-
-        'thigh02_r',
-
-        'thigh.R',
-
-        'thigh01.R',
-
-        'rightthigh'
-
-    ]
-
-},
-
-{
-
-    key:'lowerleg_r',
-
-    label:'Right Knee / Shin',
-
-    aliases:[
-
-        'calf_r',
-
-        'calf01_r',
-
-        'calf02_r',
-
-        'shin_r',
-
-        'shin.R',
-
-        'calf.R',
-
-        'rightshin'
-
-    ]
-
-}
-
-];
-
-/* ============================================================
-
-   UI
-
-============================================================ */
-
-function toggleUI(){
-
-    isUIHidden = !isUIHidden;
-
-    const panel =
-
-        document.getElementById('ui-panel');
-
-    const button =
-
-        document.getElementById('ui-toggle-btn');
-
-    panel.classList.toggle(
-
-        'hidden',
-
-        isUIHidden
-
-    );
-
-    button.innerText =
-
-        isUIHidden
-
-        ? '⚙️ Show UI'
-
-        : '👁️ Hide UI';
-
-}
-
-function switchTab(e,id){
-
-    document
-
-        .querySelectorAll('.tab')
-
-        .forEach(t =>
-
-            t.classList.remove('active')
-
-        );
-
-    document
-
-        .querySelectorAll('.tab-content')
-
-        .forEach(c =>
-
-            c.classList.remove('active')
-
-        );
-
-    if(e && e.currentTarget){
-
-        e.currentTarget
-
-            .classList.add('active');
-
-    }
-
-    const target =
-
-        document.getElementById(id);
-
-    if(target){
-
-        target.classList.add('active');
-
-    }
-
-}
-
-function updateToast(text){
-
-    const toast =
-
-        document.getElementById(
-
-            'status-toast'
-
-        );
-
-    toast.innerText = text;
-
-}
-
-/* ============================================================
-
-   INIT
-
-============================================================ */
-
-function init(){
-
-    const container =
-
-        document.getElementById(
-
-            'canvas-container'
-
-        );
-
-    scene =
-
-        new THREE.Scene();
-
-    scene.background =
-
-        new THREE.Color(
-
-            0x0e0e13
-
-        );
-
-    camera =
-
-        new THREE.PerspectiveCamera(
-
-            45,
-
-            window.innerWidth /
-
-            window.innerHeight,
-
-            0.01,
-
-            100
-
-        );
-
-    camera.position.set(
-
-        0,
-
-        1.25,
-
-        2.7
-
-    );
-
-    renderer =
-
-        new THREE.WebGLRenderer({
-
-            antialias:true,
-
-            powerPreference:
-
-                'high-performance'
-
-        });
-
-    renderer.setSize(
-
-        window.innerWidth,
-
-        window.innerHeight
-
-    );
-
-    renderer.setPixelRatio(
-
-        Math.min(
-
-            window.devicePixelRatio || 1,
-
-            2
-
-        )
-
-    );
-
-    renderer.shadowMap.enabled = true;
-
-    renderer.shadowMap.type =
-
-        THREE.PCFSoftShadowMap;
-
-    renderer.outputEncoding =
-
-        THREE.sRGBEncoding;
-
-    container.appendChild(
-
-        renderer.domElement
-
-    );
-
-    controls =
-
-        new THREE.OrbitControls(
-
-            camera,
-
-            renderer.domElement
-
-        );
-
-    controls.enableDamping = true;
-
-    controls.dampingFactor = 0.08;
-
-    controls.minDistance = 0.45;
-
-    controls.maxDistance = 10;
-
-    controls.target.set(
-
-        0,
-
-        0.9,
-
-        0
-
-    );
-
-    createStudioFloor();
-
-    modelWrapper =
-
-        new THREE.Group();
-
-    modelWrapper.name =
-
-        'MODEL_WRAPPER';
-
-    scene.add(
-
-        modelWrapper
-
-    );
-
-    colladaLoader =
-
-        new THREE.ColladaLoader();
-
-    gltfLoader =
-
-        new THREE.GLTFLoader();
-
-    setupLights();
-
-    window.addEventListener(
-
-        'resize',
-
-        onWindowResize
-
-    );
-
-    animate();
-
-    setTimeout(
-
-        tryAutoLoadZip,
-
-        300
-
-    );
-
-}
-
-/* ============================================================
-
-   FLOOR
-
-============================================================ */
-
-function createStudioFloor(){
-
-    floorPedestal =
-
-        new THREE.Mesh(
-
-            new THREE.CylinderGeometry(
-
-                0.85,
-
-                0.85,
-
-                0.02,
-
-                48
-
-            ),
-
-            new THREE.MeshStandardMaterial({
-
-                color:0x1f2438,
-
-                roughness:0.82,
-
-                metalness:0.15
-
-            })
-
-        );
-
-    floorPedestal.position.set(
-
-        0,
-
-        -0.01,
-
-        0
-
-    );
-
-    floorPedestal.receiveShadow = true;
-
-    scene.add(
-
-        floorPedestal
-
-    );
-
-    floorGrid =
-
-        new THREE.GridHelper(
-
-            6,
-
-            12,
-
-            0x333346,
-
-            0x1a1a24
-
-        );
-
-    floorGrid.position.y = 0;
-
-    scene.add(
-
-        floorGrid
-
-    );
-
-}
-
-/* ============================================================
-
-   LIGHTS
-
-============================================================ */
-
-function setupLights(){
-
-    ambientLight =
-
-        new THREE.AmbientLight(
-
-            0xffffff,
-
-            1.3
-
-        );
-
-    scene.add(
-
-        ambientLight
-
-    );
-
-    keyLight =
-
-        new THREE.DirectionalLight(
-
-            0xfff3e3,
-
-            1.8
-
-        );
-
-    keyLight.castShadow = true;
-
-    keyLight.position.set(
-
-        2.5,
-
-        3.5,
-
-        2.5
-
-    );
-
-    scene.add(
-
-        keyLight
-
-    );
-
-    fillLight =
-
-        new THREE.DirectionalLight(
-
-            0x8eb3ff,
-
-            0.7
-
-        );
-
-    fillLight.position.set(
-
-        -2.5,
-
-        2,
-
-        -1.5
-
-    );
-
-    scene.add(
-
-        fillLight
-
-    );
-
-    rimLight =
-
-        new THREE.DirectionalLight(
-
-            0xffffff,
-
-            2.2
-
-        );
-
-    rimLight.position.set(
-
-        0,
-
-        3,
-
-        -2.5
-
-    );
-
-    scene.add(
-
-        rimLight
-
-    );
-
-}
-
-function updateLights(){
-
-    if(!keyLight)
-
-        return;
-
-    const angle =
-
-        THREE.MathUtils.degToRad(
-
-            parseFloat(
-
-                document.getElementById(
-
-                    'key-angle'
-
-                ).value
-
-            )
-
-        );
-
-    const dist = 3.5;
-
-    keyLight.position.set(
-
-        Math.cos(angle) * dist,
-
-        3.2,
-
-        Math.sin(angle) * dist
-
-    );
-
-    keyLight.intensity =
-
-        parseFloat(
-
-            document.getElementById(
-
-                'key-intensity'
-
-            ).value
-
-        );
-
-    fillLight.position.set(
-
-        -Math.cos(angle) * dist,
-
-        2,
-
-        -Math.sin(angle) * dist
-
-    );
-
-    rimLight.intensity =
-
-        parseFloat(
-
-            document.getElementById(
-
-                'rim-intensity'
-
-            ).value
-
-        );
-
-}
-
-function resetLights(){
-
-    document.getElementById(
-
-        'key-angle'
-
-    ).value = 45;
-
-    document.getElementById(
-
-        'key-intensity'
-
-    ).value = 1.5;
-
-    document.getElementById(
-
-        'rim-intensity'
-
-    ).value = 2.2;
-
-    updateLights();
-
-}
-
-function applyLightingPreset(type){
-
-    if(type === 'studio'){
-
-        resetLights();
-
-        return;
-
-    }
-
-    if(type === 'daylight'){
-
-        document.getElementById(
-
-            'key-intensity'
-
-        ).value = 2.2;
-
-        document.getElementById(
-
-            'rim-intensity'
-
-        ).value = 0.4;
-
-    }
-
-    if(type === 'stage'){
-
-        document.getElementById(
-
-            'key-intensity'
-
-        ).value = 0.4;
-
-        document.getElementById(
-
-            'rim-intensity'
-
-        ).value = 3.5;
-
-    }
-
-    updateLights();
-
-}
-
-/* ============================================================
-
-   ZIP AUTO LOAD
-
-============================================================ */
-
-async function tryAutoLoadZip(){
-
-    updateToast(
-
-        'Looking for models.zip...'
-
-    );
-
-    const candidates = [
-
-        './models.zip',
-
-        'models.zip',
-
-        './Models.zip',
-
-        'Models.zip'
-
-    ];
-
-    let blob = null;
-
-    for(const url of candidates){
-
-        try{
-
-            const response =
-
-                await fetch(
-
-                    url,
-
-                    {
-
-                        cache:'no-store'
-
-                    }
-
-                );
-
-            if(response.ok){
-
-                blob =
-
-                    await response.blob();
-
-                break;
-
-            }
-
-        }catch(error){
-
-            console.warn(
-
-                'ZIP search failed:',
-
-                url,
-
-                error
-
-            );
-
+    <script>
+        let isUIHidden = false;
+        function toggleUI() {
+            isUIHidden = !isUIHidden;
+            const panel = document.getElementById('ui-panel');
+            const btn = document.getElementById('ui-toggle-btn');
+            panel.classList.toggle('hidden', isUIHidden);
+            btn.innerText = isUIHidden ? "⚙️ Show UI" : "👁️ Hide UI";
         }
 
-    }
-
-    if(!blob){
-
-        setZipBadge(
-
-            false,
-
-            'Upload Required'
-
-        );
-
-        updateToast(
-
-            'Data → models.zip ကို ရွေးပါ'
-
-        );
-
-        return;
-
-    }
-
-    try{
-
-        loadedZip =
-
-            await JSZip.loadAsync(
-
-                blob
-
-            );
-
-        setZipBadge(
-
-            true,
-
-            'ZIP Active'
-
-        );
-
-        displayZipContents();
-
-        await onModelConfigChange();
-
-    }catch(error){
-
-        console.error(error);
-
-        setZipBadge(
-
-            false,
-
-            'ZIP Error'
-
-        );
-
-        updateToast(
-
-            'models.zip ဖတ်မရပါ'
-
-        );
-
-    }
-
-}
-
-/* ============================================================
-
-   FILE UPLOAD
-
-============================================================ */
-
-async function onFileUpload(event){
-
-    const files =
-
-        [...(
-
-            event.target.files || []
-
-        )];
-
-    if(!files.length)
-
-        return;
-
-    const zipFile =
-
-        files.find(
-
-            file =>
-
-                file.name
-
-                .toLowerCase()
-
-                .endsWith('.zip')
-
-        );
-
-    if(zipFile){
-
-        try{
-
-            updateToast(
-
-                'Extracting ' +
-
-                zipFile.name +
-
-                '...'
-
-            );
-
-            loadedZip =
-
-                await JSZip.loadAsync(
-
-                    zipFile
-
-                );
-
-            setZipBadge(
-
-                true,
-
-                zipFile.name
-
-            );
-
-            displayZipContents();
-
-            await onModelConfigChange();
-
-        }catch(error){
-
-            console.error(error);
-
-            setZipBadge(
-
-                false,
-
-                'ZIP Error'
-
-            );
-
-            updateToast(
-
-                'ZIP Error: ' +
-
-                error.message
-
-            );
-
+        function switchTab(e, id) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            if (e && e.currentTarget) e.currentTarget.classList.add('active');
+            const target = document.getElementById(id);
+            if (target) target.classList.add('active');
         }
 
-        return;
-
-    }
-
-    const modelFile =
-
-        files.find(
-
-            file =>
-
-                /\.(dae|glb|gltf)$/i
-
-                .test(file.name)
-
-        );
-
-    if(!modelFile){
-
-        updateToast(
-
-            '3D Model ဖိုင် မတွေ့ပါ'
-
-        );
-
-        return;
-
-    }
-
-    try{
-
-        await loadUploadedModel(
-
-            modelFile
-
-        );
-
-    }catch(error){
-
-        console.error(error);
-
-        updateToast(
-
-            'Model Error: ' +
-
-            error.message
-
-        );
-
-    }
-
-}
-
-/* ============================================================
-
-   DIRECT UPLOAD MODEL
-
-============================================================ */
-
-async function loadUploadedModel(file){
-
-    const filename =
-
-        file.name;
-
-    updateToast(
-
-        'Loading ' +
-
-        filename +
-
-        '...'
-
-    );
-
-    const low =
-
-        filename.toLowerCase();
-
-    if(low.endsWith('.dae')){
-
-        const text =
-
-            await file.text();
-
-        parseAndLoadDae(
-
-            text,
-
-            filename
-
-        );
-
-        return;
-
-    }
-
-    if(low.endsWith('.glb')){
-
-        const buffer =
-
-            await file.arrayBuffer();
-
-        parseGLTFData(
-
-            buffer,
-
-            '',
-
-            filename
-
-        );
-
-        return;
-
-    }
-
-    if(low.endsWith('.gltf')){
-
-        const text =
-
-            await file.text();
-
-        /*
-
-         * IMPORTANT:
-
-         * A standalone .gltf may reference
-
-         * external .bin files.
-
-         *
-
-         * If the user uploads only the .gltf,
-
-         * external resources cannot be guaranteed.
-
-         */
-
-        try{
-
-            const json =
-
-                JSON.parse(text);
-
-            if(
-
-                json.buffers &&
-
-                json.buffers.some(
-
-                    b =>
-
-                        b.uri &&
-
-                        !b.uri.startsWith('data:')
-
-                )
-
-            ){
-
-                throw new Error(
-
-                    '.gltf ဖိုင်မှာ external .bin dependency ရှိပါတယ်။ .zip သို့မဟုတ် .glb သုံးပါ။'
-
-                );
-
-            }
-
-            parseGLTFData(
-
-                text,
-
-                '',
-
-                filename
-
-            );
-
-        }catch(error){
-
-            throw error;
-
+        function updateToast(txt) {
+            document.getElementById('status-toast').innerText = txt;
         }
 
-    }
-
-}
-
-/* ============================================================
-
-   ZIP CONTENTS
-
-============================================================ */
-
-function getZip3DFiles(){
-
-    if(!loadedZip)
-
-        return [];
-
-    return Object.keys(
-
-        loadedZip.files
-
-    ).filter(path => {
-
-        const entry =
-
-            loadedZip.files[path];
-
-        if(entry.dir)
-
-            return false;
-
-        if(
-
-            path.includes('__MACOSX') ||
-
-            path.startsWith('.')
-
-        )
-
-            return false;
-
-        return /\.(dae|glb|gltf)$/i
-
-            .test(path);
-
-    });
-
-}
-
-function displayZipContents(){
-
-    const select =
-
-        document.getElementById(
-
-            'sel-zip-file'
-
-        );
-
-    const list =
-
-        document.getElementById(
-
-            'zip-file-list'
-
-        );
-
-    select.innerHTML = '';
-
-    list.innerHTML = '';
-
-    const files =
-
-        getZip3DFiles().sort();
-
-    files.forEach(path => {
-
-        const option =
-
-            document.createElement(
-
-                'option'
-
-            );
-
-        option.value =
-
-            path;
-
-        option.innerText =
-
-            path.split('/').pop();
-
-        select.appendChild(
-
-            option
-
-        );
-
-        const row =
-
-            document.createElement(
-
-                'div'
-
-            );
-
-        row.innerText =
-
-            '• ' + path;
-
-        list.appendChild(
-
-            row
-
-        );
-
-    });
-
-    document.getElementById(
-
-        'zip-direct-group'
-
-    ).style.display =
-
-        files.length
-
-        ? 'block'
-
-        : 'none';
-
-    if(files.length){
-
-        updateToast(
-
-            files.length +
-
-            ' model file(s) found'
-
-        );
-
-    }else{
-
-        updateToast(
-
-            'ZIP ထဲမှာ .dae/.glb/.gltf မတွေ့ပါ'
-
-        );
-
-    }
-
-}
-
-/* ============================================================
-
-   ZIP MODEL SELECT
-
-============================================================ */
-
-async function onDirectFilePicked(path){
-
-    if(!path)
-
-        return;
-
-    updateModelSelectorsFromFilename(
-
-        path
-
-    );
-
-    await loadSpecificZipFile(
-
-        path
-
-    );
-
-}
-
-function updateModelSelectorsFromFilename(
-
-    path
-
-){
-
-    const low =
-
-        path.toLowerCase();
-
-    if(
-
-        low.includes('asian') &&
-
-        !low.includes('caucasian')
-
-    ){
-
-        document.getElementById(
-
-            'sel-ethnic'
-
-        ).value = 'asian';
-
-    }
-
-    else if(
-
-        low.includes('african')
-
-    ){
-
-        document.getElementById(
-
-            'sel-ethnic'
-
-        ).value = 'african';
-
-    }
-
-    else if(
-
-        low.includes('caucasian') ||
-
-        low.includes('caucasia')
-
-    ){
-
-        document.getElementById(
-
-            'sel-ethnic'
-
-        ).value = 'caucasian';
-
-    }
-
-    if(low.includes('female')){
-
-        document.getElementById(
-
-            'sel-gender'
-
-        ).value = 'female';
-
-    }
-
-    else if(
-
-        low.includes('male') &&
-
-        !low.includes('female')
-
-    ){
-
-        document.getElementById(
-
-            'sel-gender'
-
-        ).value = 'male';
-
-    }
-
-    [
-
-        'adult',
-
-        'teen',
-
-        'child',
-
-        'toddler',
-
-        'elderly'
-
-    ].forEach(age => {
-
-        if(low.includes(age)){
-
-            document.getElementById(
-
-                'sel-age'
-
-            ).value = age;
-
-        }
-
-    });
-
-}
-
-/* ============================================================
-
-   LOAD ZIP MODEL
-
-============================================================ */
-
-async function loadSpecificZipFile(path){
-
-    if(
-
-        !loadedZip ||
-
-        !loadedZip.files[path]
-
-    ){
-
-        throw new Error(
-
-            'ZIP model file not found'
-
-        );
-
-    }
-
-    const entry =
-
-        loadedZip.files[path];
-
-    const filename =
-
-        path.split('/').pop();
-
-    const low =
-
-        filename.toLowerCase();
-
-    updateToast(
-
-        'Loading ' +
-
-        filename +
-
-        '...'
-
-    );
-
-    if(low.endsWith('.dae')){
-
-        const text =
-
-            await entry.async(
-
-                'text'
-
-            );
-
-        parseAndLoadDae(
-
-            text,
-
-            filename
-
-        );
-
-        return;
-
-    }
-
-    /*
-
-     * GLB
-
-     */
-
-    if(low.endsWith('.glb')){
-
-        const buffer =
-
-            await entry.async(
-
-                'arraybuffer'
-
-            );
-
-        parseGLTFData(
-
-            buffer,
-
-            '',
-
-            filename
-
-        );
-
-        return;
-
-    }
-
-    /*
-
-     * GLTF
-
-     *
-
-     * We create temporary Blob URLs
-
-     * for ALL ZIP resources so that
-
-     * .bin and textures resolve correctly.
-
-     */
-
-    if(low.endsWith('.gltf')){
-
-        await loadGLTFFromZip(
-
-            path,
-
-            filename
-
-        );
-
-    }
-
-}
-
-/* ============================================================
-
-   ZIP GLTF LOADER
-
-============================================================ */
-
-async function loadGLTFFromZip(
-
-    gltfPath,
-
-    filename
-
-){
-
-    if(!loadedZip)
-
-        return;
-
-    const token =
-
-        ++loadingToken;
-
-    const urlMap = {};
-
-    const allPaths =
-
-        Object.keys(
-
-            loadedZip.files
-
-        );
-
-    /*
-
-     * Create Blob URL for every file.
-
-     */
-
-    for(const path of allPaths){
-
-        const entry =
-
-            loadedZip.files[path];
-
-        if(entry.dir)
-
-            continue;
-
-        if(
-
-            path.includes('__MACOSX') ||
-
-            path.startsWith('.')
-
-        )
-
-            continue;
-
-        try{
-
-            const data =
-
-                await entry.async(
-
-                    'arraybuffer'
-
-                );
-
-            const ext =
-
-                path
-
-                .split('.')
-
-                .pop()
-
-                .toLowerCase();
-
-            let mime =
-
-                'application/octet-stream';
-
-            if(ext === 'gltf')
-
-                mime = 'model/gltf+json';
-
-            else if(ext === 'bin')
-
-                mime = 'application/octet-stream';
-
-            else if(ext === 'png')
-
-                mime = 'image/png';
-
-            else if(
-
-                ext === 'jpg' ||
-
-                ext === 'jpeg'
-
-            )
-
-                mime = 'image/jpeg';
-
-            else if(ext === 'webp')
-
-                mime = 'image/webp';
-
-            const blob =
-
-                new Blob(
-
-                    [data],
-
-                    {type:mime}
-
-                );
-
-            urlMap[path] =
-
-                URL.createObjectURL(
-
-                    blob
-
-                );
-
-        }catch(error){
-
-            console.warn(
-
-                'Could not create URL:',
-
-                path,
-
-                error
-
-            );
-
-        }
-
-    }
-
-    /*
-
-     * Read GLTF JSON.
-
-     */
-
-    const gltfEntry =
-
-        loadedZip.files[
-
-            gltfPath
-
+        // Exact MakeHuman Skeleton (163-Bones) Alias Dictionary
+        const ANATOMICAL_JOINTS = [
+            { key: 'head', label: 'Head (ဦးခေါင်း)', aliases: ['head', 'head01', 'skull'] },
+            { key: 'neck', label: 'Neck (လည်ပင်း)', aliases: ['neck01', 'neck02', 'neck'] },
+            { key: 'chest', label: 'Chest (ရင်အုပ်)', aliases: ['spine03', 'spine04', 'spine05', 'chest'] },
+            { key: 'waist', label: 'Waist (ခါး)', aliases: ['spine01', 'spine02', 'spine', 'abdomen'] },
+            { key: 'pelvis', label: 'Pelvis (တင်ပါးဆုံ)', aliases: ['pelvis', 'root', 'hips'] },
+            { key: 'upperarm_l', label: 'Left Upper Arm (ဘယ်လက်မောင်း)', aliases: ['upperarm01_l', 'upperarm02_l', 'upperarm_l'] },
+            { key: 'lowerarm_l', label: 'Left Forearm (ဘယ်လက်ဖျံ)', aliases: ['lowerarm01_l', 'lowerarm02_l', 'lowerarm_l'] },
+            { key: 'upperarm_r', label: 'Right Upper Arm (ညာလက်မောင်း)', aliases: ['upperarm01_r', 'upperarm02_r', 'upperarm_r'] },
+            { key: 'lowerarm_r', label: 'Right Forearm (ညာလက်ဖျံ)', aliases: ['lowerarm01_r', 'lowerarm02_r', 'lowerarm_r'] },
+            { key: 'upperleg_l', label: 'Left Thigh (ဘယ်ပေါင်)', aliases: ['thigh01_l', 'thigh02_l', 'thigh_l'] },
+            { key: 'lowerleg_l', label: 'Left Knee (ဘယ်ဒူးခေါင်း)', aliases: ['calf01_l', 'calf02_l', 'calf_l'] },
+            { key: 'upperleg_r', label: 'Right Thigh (ညာပေါင်)', aliases: ['thigh01_r', 'thigh02_r', 'thigh_r'] },
+            { key: 'lowerleg_r', label: 'Right Knee (ညာဒူးခေါင်း)', aliases: ['calf01_r', 'calf02_r', 'calf_r'] }
         ];
 
-    const gltfText =
+        let scene, camera, renderer, controls, modelWrapper, floorPedestal, floorGrid;
+        let characterModel = null, bones = {}, boneMap = {}, initialRotations = {}, currentDeltas = {};
+        let keyLight, fillLight, rimLight, ambientLight;
+        let loadedZip = null, colladaLoader, gltfLoader;
 
-        await gltfEntry.async(
+        function init() {
+            const container = document.getElementById('canvas-container');
 
-            'text'
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0e0e13);
 
-        );
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.05, 100);
+            camera.position.set(0, 1.25, 2.7);
 
-    let gltfJSON;
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            container.appendChild(renderer.domElement);
 
-    try{
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0.9, 0);
+            controls.enableDamping = true;
 
-        gltfJSON =
-
-            JSON.parse(
-
-                gltfText
-
+            floorPedestal = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.85, 0.85, 0.02, 32),
+                new THREE.MeshStandardMaterial({ color: 0x1f2438, roughness: 0.82, metalness: 0.15 })
             );
+            floorPedestal.position.set(0, -0.01, 0);
+            floorPedestal.receiveShadow = true;
+            scene.add(floorPedestal);
 
-    }catch(error){
+            floorGrid = new THREE.GridHelper(6, 12, 0x333346, 0x1a1a24);
+            floorGrid.position.set(0, 0, 0);
+            scene.add(floorGrid);
 
-        throw new Error(
+            // Container Wrapper (မော်ဒယ်အား လူတစ်ရပ်စာ 1.75m အတိအကျ အံဝင်စေရန်)
+            modelWrapper = new THREE.Group();
+            scene.add(modelWrapper);
 
-            'GLTF JSON မမှန်ပါ'
+            colladaLoader = new THREE.ColladaLoader();
+            gltfLoader = new THREE.GLTFLoader();
 
-        );
+            setupLights();
 
-    }
+            window.addEventListener('resize', onWindowResize);
+            animate();
 
-    /*
-
-     * Rewrite relative URI references
-
-     * into Blob URLs.
-
-     */
-
-    const baseDir =
-
-        gltfPath.includes('/')
-
-        ? gltfPath.substring(
-
-            0,
-
-            gltfPath.lastIndexOf('/') + 1
-
-          )
-
-        : '';
-
-    function rewriteURIs(){
-
-        if(gltfJSON.buffers){
-
-            gltfJSON.buffers
-
-                .forEach(buffer => {
-
-                    if(
-
-                        buffer.uri &&
-
-                        !buffer.uri.startsWith(
-
-                            'data:'
-
-                        )
-
-                    ){
-
-                        const fullPath =
-
-                            normalizeZipPath(
-
-                                baseDir +
-
-                                buffer.uri
-
-                            );
-
-                        if(urlMap[fullPath]){
-
-                            buffer.uri =
-
-                                urlMap[fullPath];
-
-                        }
-
-                    }
-
-                });
-
+            setTimeout(tryAutoLoadZip, 250);
         }
 
-        if(gltfJSON.images){
+        function setupLights() {
+            ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
+            scene.add(ambientLight);
 
-            gltfJSON.images
+            keyLight = new THREE.DirectionalLight(0xfff3e3, 1.8);
+            keyLight.castShadow = true;
+            keyLight.position.set(2.5, 3.5, 2.5);
+            scene.add(keyLight);
 
-                .forEach(image => {
+            fillLight = new THREE.DirectionalLight(0x8eb3ff, 0.7);
+            fillLight.position.set(-2.5, 2.0, -1.5);
+            scene.add(fillLight);
 
-                    if(
-
-                        image.uri &&
-
-                        !image.uri.startsWith(
-
-                            'data:'
-
-                        )
-
-                    ){
-
-                        const fullPath =
-
-                            normalizeZipPath(
-
-                                baseDir +
-
-                                image.uri
-
-                            );
-
-                        if(urlMap[fullPath]){
-
-                            image.uri =
-
-                                urlMap[fullPath];
-
-                        }
-
-                    }
-
-                });
-
+            rimLight = new THREE.DirectionalLight(0xffffff, 2.2);
+            rimLight.position.set(0, 3.0, -2.5);
+            scene.add(rimLight);
         }
 
-    }
+        function updateLights() {
+            const angle = THREE.MathUtils.degToRad(parseFloat(document.getElementById('key-angle').value));
+            const dist = 3.5;
+            keyLight.position.set(Math.cos(angle) * dist, 3.2, Math.sin(angle) * dist);
+            keyLight.intensity = parseFloat(document.getElementById('key-intensity').value);
+            fillLight.position.set(-Math.cos(angle) * dist, 2.0, -Math.sin(angle) * dist);
+            rimLight.intensity = parseFloat(document.getElementById('rim-intensity').value);
+        }
 
-    rewriteURIs();
+        function resetLights() {
+            document.getElementById('key-angle').value = 45;
+            document.getElementById('key-intensity').value = 1.5;
+            document.getElementById('rim-intensity').value = 2.2;
+            updateLights();
+        }
 
-    /*
+        function applyLightingPreset(type) {
+            if (type === 'studio') resetLights();
+            else if (type === 'daylight') {
+                document.getElementById('key-intensity').value = 2.2;
+                document.getElementById('rim-intensity').value = 0.4;
+            } else if (type === 'stage') {
+                document.getElementById('key-intensity').value = 0.4;
+                document.getElementById('rim-intensity').value = 3.5;
+            }
+            updateLights();
+        }
 
-     * IMPORTANT:
+        async function tryAutoLoadZip() {
+            updateToast("Connecting to models.zip...");
+            const candidates = ['./models.zip', 'models.zip', './Models.zip', 'Models.zip'];
+            let foundBlob = null;
 
-     * GLTFLoader.parse() receives JSON text
-
-     * after rewriting dependencies.
-
-     */
-
-    gltfLoader.parse(
-
-        JSON.stringify(
-
-            gltfJSON
-
-        ),
-
-        '',
-
-        gltf => {
-
-            if(token !== loadingToken){
-
-                cleanupBlobURLs(
-
-                    urlMap
-
-                );
-
-                return;
-
+            for (const url of candidates) {
+                try {
+                    const res = await fetch(url, { cache: 'no-store' });
+                    if (res.ok) { foundBlob = await res.blob(); break; }
+                } catch (e) {}
             }
 
-            loadRealHumanModel(
-
-                gltf.scene ||
-
-                gltf.scenes[0],
-
-                filename,
-
-                gltf.animations || []
-
-            );
-
-            /*
-
-             * Keep blob URLs alive while model
-
-             * is in use.
-
-             */
-
-            window.__currentModelBlobURLs =
-
-                Object.values(
-
-                    urlMap
-
-                );
-
-        },
-
-        error => {
-
-            console.error(
-
-                'GLTF parse error:',
-
-                error
-
-            );
-
-            cleanupBlobURLs(
-
-                urlMap
-
-            );
-
-            updateToast(
-
-                'GLTF Error: ' +
-
-                (
-
-                    error.message ||
-
-                    error
-
-                )
-
-            );
-
-        }
-
-    );
-
-}
-
-function normalizeZipPath(path){
-
-    const parts =
-
-        path.split('/');
-
-    const output = [];
-
-    parts.forEach(part => {
-
-        if(
-
-            !part ||
-
-            part === '.'
-
-        )
-
-            return;
-
-        if(part === '..'){
-
-            output.pop();
-
-        }else{
-
-            output.push(part);
-
-        }
-
-    });
-
-    return output.join('/');
-
-}
-
-function cleanupBlobURLs(
-
-    urlMap
-
-){
-
-    Object.values(
-
-        urlMap
-
-    ).forEach(url => {
-
-        try{
-
-            URL.revokeObjectURL(
-
-                url
-
-            );
-
-        }catch(e){}
-
-    });
-
-}
-
-/* ============================================================
-
-   FIND BEST MODEL
-
-============================================================ */
-
-function findBestZipMatch(
-
-    ethnic,
-
-    gender,
-
-    age
-
-){
-
-    const files =
-
-        getZip3DFiles();
-
-    if(!files.length)
-
-        return null;
-
-    const e =
-
-        ethnic
-
-        .toLowerCase()
-
-        .trim();
-
-    const g =
-
-        gender
-
-        .toLowerCase()
-
-        .trim();
-
-    const a =
-
-        age
-
-        .toLowerCase()
-
-        .trim();
-
-    let bestFile = null;
-
-    let bestScore = -Infinity;
-
-    for(const path of files){
-
-        const low =
-
-            path
-
-            .toLowerCase()
-
-            .split('/')
-
-            .pop();
-
-        let score = 0;
-
-        /*
-
-         * Ethnicity
-
-         */
-
-        if(e === 'asian'){
-
-            if(
-
-                low.includes('asian') &&
-
-                !low.includes('caucasian')
-
-            )
-
-                score += 1000;
-
-        }
-
-        else if(e === 'african'){
-
-            if(
-
-                low.includes('african')
-
-            )
-
-                score += 1000;
-
-        }
-
-        else if(e === 'caucasian'){
-
-            if(
-
-                low.includes('caucasian') ||
-
-                low.includes('caucasia')
-
-            )
-
-                score += 1000;
-
-        }
-
-        /*
-
-         * Gender
-
-         */
-
-        if(g === 'female'){
-
-            if(
-
-                low.includes('female')
-
-            )
-
-                score += 200;
-
-        }
-
-        else if(g === 'male'){
-
-            if(
-
-                low.includes('male') &&
-
-                !low.includes('female')
-
-            )
-
-                score += 200;
-
-        }
-
-        /*
-
-         * Age
-
-         */
-
-        if(low.includes(a))
-
-            score += 50;
-
-        /*
-
-         * Prefer actual human filenames
-
-         */
-
-        if(
-
-            low.includes('human') ||
-
-            low.includes('makehuman') ||
-
-            low.includes('body')
-
-        )
-
-            score += 5;
-
-        if(score > bestScore){
-
-            bestScore =
-
-                score;
-
-            bestFile =
-
-                path;
-
-        }
-
-    }
-
-    return bestFile;
-
-}
-
-/* ============================================================
-
-   MODEL CONFIG CHANGE
-
-============================================================ */
-
-async function onModelConfigChange(){
-
-    if(!loadedZip){
-
-        updateToast(
-
-            'models.zip မတင်ရသေးပါ'
-
-        );
-
-        return;
-
-    }
-
-    const ethnic =
-
-        document.getElementById(
-
-            'sel-ethnic'
-
-        ).value;
-
-    const gender =
-
-        document.getElementById(
-
-            'sel-gender'
-
-        ).value;
-
-    const age =
-
-        document.getElementById(
-
-            'sel-age'
-
-        ).value;
-
-    const matchedPath =
-
-        findBestZipMatch(
-
-            ethnic,
-
-            gender,
-
-            age
-
-        );
-
-    if(!matchedPath){
-
-        updateToast(
-
-            'သတ်မှတ်ထားတဲ့ model မတွေ့ပါ'
-
-        );
-
-        return;
-
-    }
-
-    document.getElementById(
-
-        'sel-zip-file'
-
-    ).value =
-
-        matchedPath;
-
-    await loadSpecificZipFile(
-
-        matchedPath
-
-    );
-
-}
-
-/* ============================================================
-
-   DAE
-
-============================================================ */
-
-function parseAndLoadDae(
-
-    daeText,
-
-    filename
-
-){
-
-    try{
-
-        /*
-
-         * DO NOT destroy geometry data.
-
-         *
-
-         * Only remove transparent blocks if
-
-         * necessary.
-
-         */
-
-        let clean =
-
-            daeText;
-
-        const collada =
-
-            colladaLoader.parse(
-
-                clean,
-
-                ''
-
-            );
-
-        const targetScene =
-
-            collada.scene ||
-
-            (
-
-                collada.scenes &&
-
-                collada.scenes[0]
-
-            );
-
-        if(!targetScene){
-
-            throw new Error(
-
-                'DAE scene မတွေ့ပါ'
-
-            );
-
-        }
-
-        loadRealHumanModel(
-
-            targetScene,
-
-            filename,
-
-            collada.animations || []
-
-        );
-
-    }catch(error){
-
-        console.error(
-
-            error
-
-        );
-
-        updateToast(
-
-            'DAE Error: ' +
-
-            error.message
-
-        );
-
-    }
-
-}
-
-/* ============================================================
-
-   GLTF DIRECT PARSER
-
-============================================================ */
-
-function parseGLTFData(
-
-    data,
-
-    path,
-
-    filename
-
-){
-
-    try{
-
-        gltfLoader.parse(
-
-            data,
-
-            path || '',
-
-            gltf => {
-
-                loadRealHumanModel(
-
-                    gltf.scene ||
-
-                    gltf.scenes[0],
-
-                    filename,
-
-                    gltf.animations || []
-
-                );
-
-            },
-
-            error => {
-
-                console.error(
-
-                    error
-
-                );
-
-                updateToast(
-
-                    'GLTF Error: ' +
-
-                    (
-
-                        error.message ||
-
-                        error
-
-                    )
-
-                );
-
-            }
-
-        );
-
-    }catch(error){
-
-        console.error(
-
-            error
-
-        );
-
-        updateToast(
-
-            'GLTF Error: ' +
-
-            error.message
-
-        );
-
-    }
-
-}
-
-/* ============================================================
-
-   LOAD REAL MODEL
-
-============================================================ */
-
-function loadRealHumanModel(
-
-    model,
-
-    filename,
-
-    animations = []
-
-){
-
-    if(!model){
-
-        updateToast(
-
-            'Model Scene မရှိပါ'
-
-        );
-
-        return;
-
-    }
-
-    /*
-
-     * Remove previous model
-
-     */
-
-    clearCurrentModel();
-
-    characterModel =
-
-        model;
-
-    bones = {};
-
-    boneMap = {};
-
-    initialRotations = {};
-
-    currentDeltas = {};
-
-    /*
-
-     * Prepare materials + bones
-
-     */
-
-    const shading =
-
-        document.getElementById(
-
-            'sel-shading'
-
-        ).value;
-
-    let meshCount = 0;
-
-    characterModel.traverse(
-
-        child => {
-
-            child.visible = true;
-
-            child.frustumCulled = false;
-
-            if(
-
-                child.isBone ||
-
-                child.type === 'Bone'
-
-            ){
-
-                registerBone(
-
-                    child
-
-                );
-
-            }
-
-            if(child.isMesh){
-
-                meshCount++;
-
-                child.castShadow = true;
-
-                child.receiveShadow = true;
-
-                /*
-
-                 * IMPORTANT:
-
-                 * Keep SkinnedMesh as SkinnedMesh.
-
-                 * Only replace material.
-
-                 */
-
-                const skinned =
-
-                    child.isSkinnedMesh;
-
-                child.material =
-
-                    createArtistMaterial(
-
-                        shading,
-
-                        skinned
-
-                    );
-
-                if(
-
-                    skinned &&
-
-                    child.skeleton
-
-                ){
-
-                    child.skeleton.bones
-
-                        .forEach(
-
-                            bone =>
-
-                                registerBone(
-
-                                    bone
-
-                                )
-
-                        );
-
+            if (foundBlob) {
+                try {
+                    loadedZip = await JSZip.loadAsync(foundBlob);
+                    setZipBadge(true, "ZIP Active");
+                    displayZipContents();
+                    await onModelConfigChange();
+                } catch (e) {
+                    setZipBadge(false, "ZIP Error");
+                    updateToast("models.zip ဖတ်မရပါ");
                 }
-
+            } else {
+                setZipBadge(false, "Upload Required");
+                updateToast("Data tab မှ models.zip ကို ရွေးပေးပါ");
             }
-
         }
 
-    );
-
-    modelWrapper.add(
-
-        characterModel
-
-    );
-
-    /*
-
-     * Normalize model
-
-     */
-
-    calibrateModelWrapper();
-
-    /*
-
-     * Build rig map
-
-     */
-
-    mapAnatomicalBones();
-
-    populateBoneDropdown();
-
-    const boneCount =
-
-        Object.keys(
-
-            bones
-
-        ).length;
-
-    const mappedCount =
-
-        Object.keys(
-
-            boneMap
-
-        ).length;
-
-    const rigBox =
-
-        document.getElementById(
-
-            'rig-status-box'
-
-        );
-
-    if(boneCount > 0){
-
-        rigBox.innerHTML = `
-
-            <div style="
-
-                color:#4ade80;
-
-                font-weight:700;
-
-            ">
-
-                ● Rig Active
-
-            </div>
-
-            <div style="
-
-                font-size:10px;
-
-                color:#94a3b8;
-
-                margin-top:2px;
-
-            ">
-
-                ${filename}
-
-                <br>
-
-                • ${meshCount} Meshes
-
-                <br>
-
-                • ${boneCount} Bones
-
-                <br>
-
-                • Mapped
-
-                <b>
-
-                    ${mappedCount}
-
-                </b>
-
-                /
-
-                ${ANATOMICAL_JOINTS.length}
-
-            </div>
-
-        `;
-
-    }else{
-
-        rigBox.innerHTML = `
-
-            <div style="
-
-                color:#fbbf24;
-
-                font-weight:700;
-
-            ">
-
-                ● Model Loaded — No Rig
-
-            </div>
-
-            <div style="
-
-                font-size:10px;
-
-                color:#94a3b8;
-
-                margin-top:2px;
-
-            ">
-
-                ဒီ model မှာ skeleton/bones
-
-                မပါနိုင်ပါ။
-
-            </div>
-
-        `;
-
-    }
-
-    updateToast(
-
-        'Loaded: ' +
-
-        filename +
-
-        ' • ' +
-
-        boneCount +
-
-        ' bones'
-
-    );
-
-    loadBoneRotations();
-
-}
-
-/* ============================================================
-
-   CLEAR OLD MODEL
-
-============================================================ */
-
-function clearCurrentModel(){
-
-    if(!modelWrapper)
-
-        return;
-
-    while(
-
-        modelWrapper.children.length
-
-    ){
-
-        const object =
-
-            modelWrapper.children[
-
-                0
-
-            ];
-
-        disposeObject(
-
-            object
-
-        );
-
-        modelWrapper.remove(
-
-            object
-
-        );
-
-    }
-
-    characterModel = null;
-
-    bones = {};
-
-    boneMap = {};
-
-    initialRotations = {};
-
-    currentDeltas = {};
-
-}
-
-function disposeObject(
-
-    object
-
-){
-
-    object.traverse(
-
-        child => {
-
-            if(child.geometry){
-
-                child.geometry.dispose();
-
+        async function onFileUpload(e) {
+            const files = [...(e.target.files || [])];
+            if (!files.length) return;
+
+            const zipFile = files.find(f => f.name.toLowerCase().endsWith('.zip'));
+            if (zipFile) {
+                updateToast("Extracting " + zipFile.name + "...");
+                try {
+                    loadedZip = await JSZip.loadAsync(zipFile);
+                    setZipBadge(true, zipFile.name);
+                    displayZipContents();
+                    await onModelConfigChange();
+                } catch (err) {
+                    alert("ZIP ဖတ်မရပါ: " + err.message);
+                }
+                return;
             }
 
-            if(child.material){
+            const modelFile = files.find(f => /\.(dae|glb|gltf)$/i.test(f.name));
+            if (!modelFile) return;
 
-                const materials =
+            updateToast("Rendering " + modelFile.name + "...");
+            const low = modelFile.name.toLowerCase();
 
-                    Array.isArray(
-
-                        child.material
-
-                    )
-
-                    ? child.material
-
-                    : [child.material];
-
-                materials.forEach(
-
-                    material => {
-
-                        if(!material)
-
-                            return;
-
-                        Object.keys(
-
-                            material
-
-                        ).forEach(
-
-                            key => {
-
-                                const value =
-
-                                    material[key];
-
-                                if(
-
-                                    value &&
-
-                                    value.isTexture
-
-                                ){
-
-                                    value.dispose();
-
-                                }
-
-                            }
-
-                        );
-
-                        material.dispose();
-
-                    }
-
-                );
-
+            if (low.endsWith('.dae')) {
+                const text = await modelFile.text();
+                parseAndLoadDae(text, modelFile.name);
+            } else if (low.endsWith('.glb') || low.endsWith('.gltf')) {
+                const buffer = await modelFile.arrayBuffer();
+                gltfLoader.parse(buffer, '', (gltf) => {
+                    loadRealHumanModel(gltf.scene, modelFile.name);
+                });
             }
-
         }
 
-    );
-
-}
-
-/* ============================================================
-
-   BONE REGISTRATION
-
-============================================================ */
-
-function registerBone(
-
-    bone
-
-){
-
-    if(
-
-        !bone ||
-
-        !bone.name
-
-    )
-
-        return;
-
-    if(
-
-        bones[bone.name]
-
-    )
-
-        return;
-
-    bone.matrixAutoUpdate = true;
-
-    /*
-
-     * Save ORIGINAL rest pose.
-
-     *
-
-     * We do this once.
-
-     */
-
-    bone.updateMatrixWorld(
-
-        true
-
-    );
-
-    bone.userData.restPosition =
-
-        bone.position.clone();
-
-    bone.userData.restQuaternion =
-
-        bone.quaternion.clone();
-
-    bone.userData.restScale =
-
-        bone.scale.clone();
-
-    bones[bone.name] =
-
-        bone;
-
-    initialRotations[
-
-        bone.name
-
-    ] = {
-
-        x:0,
-
-        y:0,
-
-        z:0
-
-    };
-
-    currentDeltas[
-
-        bone.name
-
-    ] = {
-
-        x:0,
-
-        y:0,
-
-        z:0
-
-    };
-
-}
-
-/* ============================================================
-
-   CALIBRATE
-
-============================================================ */
-
-function calibrateModelWrapper(){
-
-    if(
-
-        !modelWrapper ||
-
-        !modelWrapper.children.length
-
-    )
-
-        return;
-
-    modelWrapper.position.set(
-
-        0,
-
-        0,
-
-        0
-
-    );
-
-    modelWrapper.scale.set(
-
-        1,
-
-        1,
-
-        1
-
-    );
-
-    modelWrapper.rotation.set(
-
-        0,
-
-        0,
-
-        0
-
-    );
-
-    modelWrapper.updateMatrixWorld(
-
-        true
-
-    );
-
-    const box =
-
-        new THREE.Box3()
-
-        .setFromObject(
-
-            modelWrapper
-
-        );
-
-    if(box.isEmpty()){
-
-        updateToast(
-
-            'Model geometry empty'
-
-        );
-
-        return;
-
-    }
-
-    const size =
-
-        box.getSize(
-
-            new THREE.Vector3()
-
-        );
-
-    const height =
-
-        size.y;
-
-    const targetHeight =
-
-        1.75;
-
-    const scaleFactor =
-
-        targetHeight /
-
-        Math.max(
-
-            height,
-
-            0.0001
-
-        );
-
-    modelWrapper.scale.setScalar(
-
-        scaleFactor
-
-    );
-
-    modelWrapper.updateMatrixWorld(
-
-        true
-
-    );
-
-    const finalBox =
-
-        new THREE.Box3()
-
-        .setFromObject(
-
-            modelWrapper
-
-        );
-
-    const center =
-
-        finalBox.getCenter(
-
-            new THREE.Vector3()
-
-        );
-
-    modelWrapper.position.x =
-
-        -center.x;
-
-    modelWrapper.position.z =
-
-        -center.z;
-
-    modelWrapper.position.y =
-
-        -finalBox.min.y;
-
-    modelWrapper.updateMatrixWorld(
-
-        true
-
-    );
-
-    camera.position.set(
-
-        0,
-
-        1.25,
-
-        2.7
-
-    );
-
-    controls.target.set(
-
-        0,
-
-        0.9,
-
-        0
-
-    );
-
-    controls.update();
-
-}
-
-/* ============================================================
-
-   FOCUS
-
-============================================================ */
-
-function focusCameraOnModel(){
-
-    if(!characterModel){
-
-        updateToast(
-
-            'Model မရှိသေးပါ'
-
-        );
-
-        return;
-
-    }
-
-    const box =
-
-        new THREE.Box3()
-
-        .setFromObject(
-
-            characterModel
-
-        );
-
-    if(box.isEmpty())
-
-        return;
-
-    const center =
-
-        box.getCenter(
-
-            new THREE.Vector3()
-
-        );
-
-    const size =
-
-        box.getSize(
-
-            new THREE.Vector3()
-
-        );
-
-    const maxSize =
-
-        Math.max(
-
-            size.x,
-
-            size.y,
-
-            size.z
-
-        );
-
-    const distance =
-
-        maxSize /
-
-        (
-
-            2 *
-
-            Math.tan(
-
-                THREE.MathUtils.degToRad(
-
-                    camera.fov
-
-                ) / 2
-
-            )
-
-        );
-
-    camera.position.set(
-
-        center.x,
-
-        center.y,
-
-        center.z +
-
-        distance * 1.25
-
-    );
-
-    controls.target.copy(
-
-        center
-
-    );
-
-    controls.update();
-
-}
-
-/* ============================================================
-
-   MATERIAL
-
-============================================================ */
-
-function createArtistMaterial(
-
-    mode,
-
-    isSkinned
-
-){
-
-    const common = {
-
-        side:
-
-            THREE.DoubleSide,
-
-        roughness:
-
-            0.85,
-
-        metalness:
-
-            0.05
-
-    };
-
-    /*
-
-     * In r128 MeshStandardMaterial
-
-     * skinning is enabled explicitly.
-
-     */
-
-    if(isSkinned){
-
-        common.skinning = true;
-
-    }
-
-    if(mode === 'clay'){
-
-        return new THREE.MeshStandardMaterial({
-
-            ...common,
-
-            color:0xd6cbb8
-
-        });
-
-    }
-
-    if(mode === 'planar'){
-
-        return new THREE.MeshStandardMaterial({
-
-            ...common,
-
-            color:0xd2d2dc,
-
-            flatShading:true
-
-        });
-
-    }
-
-    if(mode === 'ecorche'){
-
-        return new THREE.MeshStandardMaterial({
-
-            ...common,
-
-            color:0x9b3838,
-
-            roughness:0.65
-
-        });
-
-    }
-
-    if(mode === 'wireframe'){
-
-        const material =
-
-            new THREE.MeshBasicMaterial({
-
-                color:0x6366f1,
-
-                wireframe:true,
-
-                side:
-
-                    THREE.DoubleSide
-
+        function setZipBadge(ok, text) {
+            const badge = document.getElementById('zip-badge');
+            badge.innerText = text;
+            badge.className = "status-badge " + (ok ? "" : "error");
+        }
+
+        // Subfolder များပါ အလိုအလျောက် ရှာဖွေနိုင်သည့် ZIP Scanner
+        function getZip3DFiles() {
+            if (!loadedZip) return [];
+            return Object.keys(loadedZip.files).filter(k => {
+                if (loadedZip.files[k].dir || k.includes('__MACOSX') || k.startsWith('.')) return false;
+                const low = k.toLowerCase();
+                return low.endsWith('.dae') || low.endsWith('.glb') || low.endsWith('.gltf');
+            });
+        }
+
+        function displayZipContents() {
+            if (!loadedZip) return;
+            const select = document.getElementById('sel-zip-file');
+            select.innerHTML = '';
+            const files = getZip3DFiles().sort();
+            files.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.innerText = f.split('/').pop();
+                select.appendChild(opt);
+            });
+            document.getElementById('zip-direct-group').style.display = files.length > 0 ? 'block' : 'none';
+        }
+
+        async function loadSpecificZipFile(path) {
+            if (!loadedZip || !loadedZip.files[path]) return;
+            const entry = loadedZip.files[path];
+            const name = path.split('/').pop();
+            updateToast("Rendering " + name + "...");
+
+            const low = name.toLowerCase();
+            if (low.endsWith('.dae')) {
+                const text = await entry.async("text");
+                parseAndLoadDae(text, name);
+            } else {
+                const buffer = await entry.async("arraybuffer");
+                gltfLoader.parse(buffer, '', (gltf) => {
+                    loadRealHumanModel(gltf.scene, name);
+                });
+            }
+        }
+
+        function onDirectFilePicked(path) {
+            if (!path) return;
+            const low = path.toLowerCase();
+            if (low.includes('asian') && !low.includes('caucasian')) document.getElementById('sel-ethnic').value = 'asian';
+            else if (low.includes('african')) document.getElementById('sel-ethnic').value = 'african';
+            else if (low.includes('caucasian') || low.includes('caucasia')) document.getElementById('sel-ethnic').value = 'caucasian';
+
+            if (low.includes('female')) document.getElementById('sel-gender').value = 'female';
+            else if (low.includes('male') && !low.includes('female')) document.getElementById('sel-gender').value = 'male';
+
+            ['adult','teen','child','toddler','elderly'].forEach(a => {
+                if (low.includes(a)) document.getElementById('sel-age').value = a;
             });
 
-        if(isSkinned){
-
-            material.skinning = true;
-
+            loadSpecificZipFile(path);
         }
 
-        return material;
-
-    }
-
-    return new THREE.MeshStandardMaterial({
-
-        ...common,
-
-        color:0xcccccc
-
-    });
-
-}
-
-/* ============================================================
-
-   SHADING
-
-============================================================ */
-
-function applyShadingMode(
-
-    mode
-
-){
-
-    if(!characterModel)
-
-        return;
-
-    characterModel.traverse(
-
-        child => {
-
-            if(!child.isMesh)
-
-                return;
-
-            child.material =
-
-                createArtistMaterial(
-
-                    mode,
-
-                    child.isSkinnedMesh
-
-                );
-
-        }
-
-    );
-
-}
-
-/* ============================================================
-
-   BONE MAP
-
-============================================================ */
-
-function normalizeBoneName(
-
-    name
-
-){
-
-    return name
-
-        .toLowerCase()
-
-        .replace(
-
-            /[^a-z0-9]/g,
-
-            ''
-
-        );
-
-}
-
-function mapAnatomicalBones(){
-
-    boneMap = {};
-
-    const names =
-
-        Object.keys(
-
-            bones
-
-        );
-
-    /*
-
-     * Exact aliases first.
-
-     */
-
-    ANATOMICAL_JOINTS
-
-        .forEach(
-
-            joint => {
-
-                let match =
-
-                    null;
-
-                for(
-
-                    const alias
-
-                    of joint.aliases
-
-                ){
-
-                    const clean =
-
-                        normalizeBoneName(
-
-                            alias
-
-                        );
-
-                    match =
-
-                        names.find(
-
-                            name =>
-
-                                normalizeBoneName(
-
-                                    name
-
-                                ) === clean
-
-                        );
-
-                    if(match)
-
-                        break;
-
+        function findBestZipMatch(ethnic, gender, age) {
+            const files = getZip3DFiles();
+            if (files.length === 0) return null;
+
+            const e = ethnic.toLowerCase().trim();
+            const g = gender.toLowerCase().trim();
+            const a = age.toLowerCase().trim();
+
+            let bestFile = null;
+            let maxScore = -1;
+
+            for (const path of files) {
+                const low = path.split('/').pop().toLowerCase();
+                let score = 0;
+
+                if (e === 'asian') {
+                    if (low.includes('asian') && !low.includes('caucasian') && !low.includes('caucasia')) score += 1000;
+                } else if (e === 'african') {
+                    if (low.includes('african')) score += 1000;
+                } else if (e === 'caucasian') {
+                    if (low.includes('caucasian') || low.includes('caucasia')) score += 1000;
                 }
 
-                /*
+                if (g === 'female' && low.includes('female')) score += 100;
+                else if (g === 'male' && low.includes('male') && !low.includes('female')) score += 100;
 
-                 * Fuzzy matching.
+                if (low.includes(a)) score += 10;
 
-                 */
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestFile = path;
+                }
+            }
 
-                if(!match){
+            return bestFile || files[0];
+        }
 
-                    for(
+        async function onModelConfigChange() {
+            if (!loadedZip) return;
+            const ethnic = document.getElementById('sel-ethnic').value;
+            const gender = document.getElementById('sel-gender').value;
+            const age = document.getElementById('sel-age').value;
 
-                        const alias
+            const matchedPath = findBestZipMatch(ethnic, gender, age);
+            if (!matchedPath) {
+                updateToast("မော်ဒယ်ဖိုင် ရှာမတွေ့ပါ");
+                return;
+            }
 
-                        of joint.aliases
+            document.getElementById('sel-zip-file').value = matchedPath;
+            await loadSpecificZipFile(matchedPath);
+        }
 
-                    ){
+        function parseAndLoadDae(daeText, filename) {
+            try {
+                let clean = daeText.replace(/<init_from>[\s\S]*?<\/init_from>/gi, '<init_from></init_from>');
+                clean = clean.replace(/<transparent[\s\S]*?<\/transparent>/gi, '');
 
-                        const clean =
+                const collada = colladaLoader.parse(clean, '');
+                const targetScene = collada.scene || (collada.scenes && collada.scenes[0]);
+                if (!targetScene) throw new Error("Invalid DAE structure");
 
-                            normalizeBoneName(
+                loadRealHumanModel(targetScene, filename);
+            } catch (err) {
+                alert("DAE Error: " + err.message);
+                updateToast("DAE Error: " + err.message);
+            }
+        }
 
-                                alias
+        function loadRealHumanModel(model, filename) {
+            while (modelWrapper.children.length > 0) {
+                modelWrapper.remove(modelWrapper.children[0]);
+            }
 
-                            );
+            characterModel = model;
+            bones = {};
+            boneMap = {};
+            initialRotations = {};
+            currentDeltas = {};
 
-                        match =
+            const activeShading = document.getElementById('sel-shading').value;
 
-                            names.find(
+            // 1. Traverse Meshes & Bones (NO DECOMPOSE BUG!)
+            characterModel.traverse((child) => {
+                child.visible = true;
+                child.frustumCulled = false;
 
-                                name => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
 
-                                    const n =
+                    const isSkinned = Boolean(child.isSkinnedMesh);
+                    child.material = createArtistMaterial(activeShading, isSkinned);
 
-                                        normalizeBoneName(
-
-                                            name
-
-                                        );
-
-                                    return (
-
-                                        n.endsWith(
-
-                                            clean
-
-                                        ) ||
-
-                                        n.includes(
-
-                                            clean
-
-                                        )
-
-                                    );
-
-                                }
-
-                            );
-
-                        if(match)
-
-                            break;
-
+                    if (isSkinned && child.skeleton && child.skeleton.bones) {
+                        child.skeleton.bones.forEach(b => registerBone(b));
                     }
-
                 }
 
-                if(match){
-
-                    boneMap[
-
-                        joint.key
-
-                    ] = match;
-
+                if (child.isBone || child.type === 'Bone') {
+                    registerBone(child);
                 }
-
-            }
-
-        );
-
-}
-
-/* ============================================================
-
-   BONE DROPDOWN
-
-============================================================ */
-
-function populateBoneDropdown(){
-
-    const select =
-
-        document.getElementById(
-
-            'sel-bone'
-
-        );
-
-    select.innerHTML = '';
-
-    const majorGroup =
-
-        document.createElement(
-
-            'optgroup'
-
-        );
-
-    majorGroup.label =
-
-        '── Major Body Joints ──';
-
-    ANATOMICAL_JOINTS
-
-        .forEach(
-
-            item => {
-
-                const option =
-
-                    document.createElement(
-
-                        'option'
-
-                    );
-
-                option.value =
-
-                    item.key;
-
-                const actual =
-
-                    boneMap[
-
-                        item.key
-
-                    ];
-
-                option.innerText =
-
-                    item.label +
-
-                    (
-
-                        actual
-
-                        ? ' ✓'
-
-                        : ' [No Bone]'
-
-                    );
-
-                majorGroup.appendChild(
-
-                    option
-
-                );
-
-            }
-
-        );
-
-    select.appendChild(
-
-        majorGroup
-
-    );
-
-    /*
-
-     * Raw bones
-
-     */
-
-    const rawNames =
-
-        Object.keys(
-
-            bones
-
-        ).sort();
-
-    if(rawNames.length){
-
-        const rawGroup =
-
-            document.createElement(
-
-                'optgroup'
-
-            );
-
-        rawGroup.label =
-
-            '── All Rig Bones ──';
-
-        rawNames.forEach(
-
-            name => {
-
-                const option =
-
-                    document.createElement(
-
-                        'option'
-
-                    );
-
-                option.value =
-
-                    'raw:' + name;
-
-                option.innerText =
-
-                    name;
-
-                rawGroup.appendChild(
-
-                    option
-
-                );
-
-            }
-
-        );
-
-        select.appendChild(
-
-            rawGroup
-
-        );
-
-    }
-
-    loadBoneRotations();
-
-}
-
-/* ============================================================
-
-   GET ACTUAL BONE
-
-============================================================ */
-
-function getActualBoneName(
-
-    value
-
-){
-
-    if(!value)
-
-        return null;
-
-    if(
-
-        value.startsWith(
-
-            'raw:'
-
-        )
-
-    ){
-
-        return value.substring(
-
-            4
-
-        );
-
-    }
-
-    return boneMap[value] || null;
-
-}
-
-/* ============================================================
-
-   LOAD ROTATION VALUES
-
-============================================================ */
-
-function loadBoneRotations(){
-
-    const select =
-
-        document.getElementById(
-
-            'sel-bone'
-
-        );
-
-    if(!select)
-
-        return;
-
-    const value =
-
-        select.value;
-
-    const actual =
-
-        getActualBoneName(
-
-            value
-
-        );
-
-    const delta =
-
-        actual &&
-
-        currentDeltas[
-
-            actual
-
-        ]
-
-        ? currentDeltas[
-
-            actual
-
-        ]
-
-        : {
-
-            x:0,
-
-            y:0,
-
-            z:0
-
-        };
-
-    document.getElementById(
-
-        'rot-x'
-
-    ).value =
-
-        delta.x;
-
-    document.getElementById(
-
-        'rot-y'
-
-    ).value =
-
-        delta.y;
-
-    document.getElementById(
-
-        'rot-z'
-
-    ).value =
-
-        delta.z;
-
-    updateRotationLabels(
-
-        delta.x,
-
-        delta.y,
-
-        delta.z
-
-    );
-
-}
-
-function updateRotationLabels(
-
-    x,
-
-    y,
-
-    z
-
-){
-
-    document.getElementById(
-
-        'val-rx'
-
-    ).innerText =
-
-        x + '°';
-
-    document.getElementById(
-
-        'val-ry'
-
-    ).innerText =
-
-        y + '°';
-
-    document.getElementById(
-
-        'val-rz'
-
-    ).innerText =
-
-        z + '°';
-
-}
-
-/* ============================================================
-
-   LIVE BONE ROTATION
-
-============================================================ */
-
-function updateBoneRotation(){
-
-    const value =
-
-        document.getElementById(
-
-            'sel-bone'
-
-        ).value;
-
-    const actual =
-
-        getActualBoneName(
-
-            value
-
-        );
-
-    if(
-
-        !actual ||
-
-        !bones[actual]
-
-    ){
-
-        updateRotationLabels(
-
-            0,
-
-            0,
-
-            0
-
-        );
-
-        return;
-
-    }
-
-    const x =
-
-        parseFloat(
-
-            document.getElementById(
-
-                'rot-x'
-
-            ).value
-
-        );
-
-    const y =
-
-        parseFloat(
-
-            document.getElementById(
-
-                'rot-y'
-
-            ).value
-
-        );
-
-    const z =
-
-        parseFloat(
-
-            document.getElementById(
-
-                'rot-z'
-
-            ).value
-
-        );
-
-    applyRotationToBoneName(
-
-        actual,
-
-        x,
-
-        y,
-
-        z
-
-    );
-
-    updateRotationLabels(
-
-        x,
-
-        y,
-
-        z
-
-    );
-
-}
-
-/* ============================================================
-
-   BONE ROTATION ENGINE
-
-============================================================ */
-
-function applyRotationToBoneName(
-
-    boneName,
-
-    dx,
-
-    dy,
-
-    dz
-
-){
-
-    const bone =
-
-        bones[boneName];
-
-    if(
-
-        !bone ||
-
-        !bone.userData.restQuaternion
-
-    )
-
-        return;
-
-    currentDeltas[
-
-        boneName
-
-    ] = {
-
-        x:dx,
-
-        y:dy,
-
-        z:dz
-
-    };
-
-    /*
-
-     * Start from exact rest quaternion.
-
-     */
-
-    bone.quaternion.copy(
-
-        bone.userData
-
-            .restQuaternion
-
-    );
-
-    /*
-
-     * Apply user delta.
-
-     */
-
-    const delta =
-
-        new THREE.Quaternion()
-
-        .setFromEuler(
-
-            new THREE.Euler(
-
-                THREE.MathUtils
-
-                    .degToRad(dx),
-
-                THREE.MathUtils
-
-                    .degToRad(dy),
-
-                THREE.MathUtils
-
-                    .degToRad(dz),
-
-                'XYZ'
-
-            )
-
-        );
-
-    bone.quaternion.multiply(
-
-        delta
-
-    );
-
-    bone.updateMatrix();
-
-    /*
-
-     * Force skeleton update.
-
-     */
-
-    if(characterModel){
-
-        characterModel.traverse(
-
-            child => {
-
-                if(
-
-                    child.isSkinnedMesh &&
-
-                    child.skeleton
-
-                ){
-
-                    child.skeleton.update();
-
-                }
-
-            }
-
-        );
-
-    }
-
-    scene.updateMatrixWorld(
-
-        true
-
-    );
-
-}
-
-/* ============================================================
-
-   RESET CURRENT
-
-============================================================ */
-
-function resetCurrentBone(){
-
-    const value =
-
-        document.getElementById(
-
-            'sel-bone'
-
-        ).value;
-
-    const actual =
-
-        getActualBoneName(
-
-            value
-
-        );
-
-    if(!actual)
-
-        return;
-
-    applyRotationToBoneName(
-
-        actual,
-
-        0,
-
-        0,
-
-        0
-
-    );
-
-    loadBoneRotations();
-
-}
-
-/* ============================================================
-
-   RESET ALL
-
-============================================================ */
-
-function resetAllBonesToRestPose(){
-
-    Object.keys(
-
-        bones
-
-    ).forEach(
-
-        name => {
-
-            const bone =
-
-                bones[name];
-
-            if(
-
-                !bone ||
-
-                !bone.userData
-
-                    .restQuaternion
-
-            )
-
-                return;
-
-            bone.position.copy(
-
-                bone.userData
-
-                    .restPosition
-
-            );
-
-            bone.quaternion.copy(
-
-                bone.userData
-
-                    .restQuaternion
-
-            );
-
-            bone.scale.copy(
-
-                bone.userData
-
-                    .restScale
-
-            );
-
-            currentDeltas[
-
-                name
-
-            ] = {
-
-                x:0,
-
-                y:0,
-
-                z:0
-
+            });
+
+            modelWrapper.add(characterModel);
+
+            // 2. Exact 1.75m Scale Alignment (Turn 5 Standard)
+            calibrateModelWrapper();
+
+            // 3. Connect MakeHuman 163-Bones
+            mapAnatomicalBones();
+            populateBoneDropdown();
+
+            const boneCount = Object.keys(bones).length;
+            const mappedCount = Object.keys(boneMap).length;
+            const rigBox = document.getElementById('rig-status-box');
+
+            rigBox.innerHTML = `
+                <div style="color:#4ade80; font-weight:700;">● Rig Active: ${filename}</div>
+                <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
+                    • ${boneCount} Bones Ready | Mapped: <b>${mappedCount} / ${ANATOMICAL_JOINTS.length}</b> joints
+                </div>
+            `;
+
+            updateToast(`Loaded: ${filename} (${boneCount} bones)`);
+            loadBoneRotations();
+        }
+
+        // Bone Registration preserving ColladaLoader's exact position & rotation
+        function registerBone(b) {
+            if (!b || !b.name) return;
+            b.matrixAutoUpdate = true;
+            if (!b.userData.restQuat) b.userData.restQuat = b.quaternion.clone();
+            bones[b.name] = b;
+            initialRotations[b.name] = { x: 0, y: 0, z: 0 };
+            currentDeltas[b.name] = { x: 0, y: 0, z: 0 };
+        }
+
+        function calibrateModelWrapper() {
+            if (!modelWrapper || modelWrapper.children.length === 0) return;
+
+            modelWrapper.position.set(0, 0, 0);
+            modelWrapper.scale.set(1, 1, 1);
+            modelWrapper.rotation.set(0, 0, 0);
+            modelWrapper.updateMatrixWorld(true);
+
+            const box = new THREE.Box3().setFromObject(modelWrapper);
+            if (box.isEmpty()) return;
+
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+
+            const targetHeight = 1.75;
+            const scaleFactor = targetHeight / (maxDim > 0 ? maxDim : 1);
+            modelWrapper.scale.setScalar(scaleFactor);
+            modelWrapper.updateMatrixWorld(true);
+
+            const finalBox = new THREE.Box3().setFromObject(modelWrapper);
+            const finalCenter = finalBox.getCenter(new THREE.Vector3());
+
+            modelWrapper.position.x = -finalCenter.x;
+            modelWrapper.position.z = -finalCenter.z;
+            modelWrapper.position.y = -finalBox.min.y;
+
+            camera.position.set(0, 1.25, 2.7);
+            controls.target.set(0, 0.9, 0);
+            camera.lookAt(0, 0.9, 0);
+            controls.update();
+        }
+
+        function focusCameraOnModel() {
+            calibrateModelWrapper();
+        }
+
+        function createArtistMaterial(mode, isSkinned) {
+            const params = {
+                skinning: isSkinned,
+                side: THREE.DoubleSide,
+                roughness: 0.85,
+                metalness: 0.05
             };
 
-            bone.updateMatrix();
-
+            if (mode === 'clay') {
+                return new THREE.MeshStandardMaterial({ ...params, color: 0xd6cbb8 });
+            } else if (mode === 'planar') {
+                return new THREE.MeshStandardMaterial({ ...params, color: 0xd2d2dc, flatShading: true });
+            } else if (mode === 'ecorche') {
+                return new THREE.MeshStandardMaterial({ ...params, color: 0x9b3838, roughness: 0.65 });
+            } else if (mode === 'wireframe') {
+                return new THREE.MeshBasicMaterial({ color: 0x6366f1, wireframe: true });
+            }
+            return new THREE.MeshStandardMaterial({ ...params, color: 0xcccccc });
         }
 
-    );
+        function applyShadingMode(mode) {
+            if (!characterModel) return;
+            characterModel.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = createArtistMaterial(mode, Boolean(child.isSkinnedMesh));
+                }
+            });
+        }
 
-    scene.updateMatrixWorld(
+        function mapAnatomicalBones() {
+            boneMap = {};
+            const allBoneNames = Object.keys(bones);
 
-        true
+            ANATOMICAL_JOINTS.forEach(joint => {
+                let matched = null;
 
-    );
-
-    if(characterModel){
-
-        characterModel.traverse(
-
-            child => {
-
-                if(
-
-                    child.isSkinnedMesh &&
-
-                    child.skeleton
-
-                ){
-
-                    child.skeleton.update();
-
+                for (const alias of joint.aliases) {
+                    const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    matched = allBoneNames.find(name => {
+                        const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        return cleanName === cleanAlias;
+                    });
+                    if (matched) break;
                 }
 
-            }
-
-        );
-
-    }
-
-    loadBoneRotations();
-
-}
-
-/* ============================================================
-
-   PRESET POSES
-
-============================================================ */
-
-function applyPresetPose(
-
-    pose
-
-){
-
-    if(
-
-        !characterModel ||
-
-        Object.keys(bones).length === 0
-
-    ){
-
-        updateToast(
-
-            'Rig ပါတဲ့ Model ကို အရင် Load လုပ်ပါ'
-
-        );
-
-        return;
-
-    }
-
-    resetAllBonesToRestPose();
-
-    const joint =
-
-        (
-
-            key,
-
-            x,
-
-            y,
-
-            z
-
-        ) => {
-
-            const actual =
-
-                boneMap[key];
-
-            if(actual){
-
-                applyRotationToBoneName(
-
-                    actual,
-
-                    x,
-
-                    y,
-
-                    z
-
-                );
-
-            }
-
-        };
-
-    if(pose === 'contrapposto'){
-
-        joint(
-
-            'pelvis',
-
-            0,
-
-            0,
-
-            -5
-
-        );
-
-        joint(
-
-            'waist',
-
-            3,
-
-            5,
-
-            5
-
-        );
-
-        joint(
-
-            'chest',
-
-            -2,
-
-            -4,
-
-            2
-
-        );
-
-        joint(
-
-            'head',
-
-            4,
-
-            -14,
-
-            2
-
-        );
-
-        joint(
-
-            'upperleg_r',
-
-            -6,
-
-            0,
-
-            4
-
-        );
-
-        joint(
-
-            'upperleg_l',
-
-            25,
-
-            -5,
-
-            -8
-
-        );
-
-        joint(
-
-            'lowerleg_l',
-
-            -35,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'upperarm_r',
-
-            12,
-
-            0,
-
-            15
-
-        );
-
-        joint(
-
-            'lowerarm_r',
-
-            0,
-
-            0,
-
-            25
-
-        );
-
-        joint(
-
-            'upperarm_l',
-
-            6,
-
-            0,
-
-            -10
-
-        );
-
-    }
-
-    else if(pose === 'sitting'){
-
-        joint(
-
-            'upperleg_l',
-
-            -85,
-
-            4,
-
-            -6
-
-        );
-
-        joint(
-
-            'upperleg_r',
-
-            -85,
-
-            -4,
-
-            6
-
-        );
-
-        joint(
-
-            'lowerleg_l',
-
-            90,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'lowerleg_r',
-
-            90,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'waist',
-
-            8,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'chest',
-
-            4,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'lowerarm_l',
-
-            -25,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'lowerarm_r',
-
-            -25,
-
-            0,
-
-            0
-
-        );
-
-    }
-
-    else if(pose === 'walking'){
-
-        joint(
-
-            'pelvis',
-
-            0,
-
-            10,
-
-            0
-
-        );
-
-        joint(
-
-            'upperleg_r',
-
-            -35,
-
-            4,
-
-            0
-
-        );
-
-        joint(
-
-            'lowerleg_r',
-
-            20,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'upperleg_l',
-
-            25,
-
-            -4,
-
-            0
-
-        );
-
-        joint(
-
-            'lowerleg_l',
-
-            -30,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'upperarm_l',
-
-            -30,
-
-            8,
-
-            12
-
-        );
-
-        joint(
-
-            'lowerarm_l',
-
-            -20,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'upperarm_r',
-
-            25,
-
-            -6,
-
-            -12
-
-        );
-
-        joint(
-
-            'waist',
-
-            4,
-
-            -10,
-
-            0
-
-        );
-
-    }
-
-    else if(pose === 'folded_arms'){
-
-        joint(
-
-            'upperarm_l',
-
-            25,
-
-            38,
-
-            20
-
-        );
-
-        joint(
-
-            'lowerarm_l',
-
-            -80,
-
-            20,
-
-            25
-
-        );
-
-        joint(
-
-            'upperarm_r',
-
-            25,
-
-            -38,
-
-            -20
-
-        );
-
-        joint(
-
-            'lowerarm_r',
-
-            -80,
-
-            -20,
-
-            -25
-
-        );
-
-        joint(
-
-            'waist',
-
-            2,
-
-            0,
-
-            0
-
-        );
-
-    }
-
-    else if(pose === 'thinker'){
-
-        joint(
-
-            'upperleg_l',
-
-            -75,
-
-            4,
-
-            0
-
-        );
-
-        joint(
-
-            'upperleg_r',
-
-            -75,
-
-            -4,
-
-            0
-
-        );
-
-        joint(
-
-            'lowerleg_l',
-
-            80,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'lowerleg_r',
-
-            80,
-
-            0,
-
-            0
-
-        );
-
-        joint(
-
-            'waist',
-
-            25,
-
-            -12,
-
-            0
-
-        );
-
-        joint(
-
-            'chest',
-
-            15,
-
-            -6,
-
-            0
-
-        );
-
-        joint(
-
-            'head',
-
-            -25,
-
-            18,
-
-            0
-
-        );
-
-        joint(
-
-            'upperarm_r',
-
-            -55,
-
-            25,
-
-            20
-
-        );
-
-        joint(
-
-            'lowerarm_r',
-
-            -95,
-
-            25,
-
-            0
-
-        );
-
-    }
-
-    loadBoneRotations();
-
-}
-
-/* ============================================================
-
-   RESIZE
-
-============================================================ */
-
-function onWindowResize(){
-
-    camera.aspect =
-
-        window.innerWidth /
-
-        window.innerHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-
-        window.innerWidth,
-
-        window.innerHeight
-
-    );
-
-}
-
-/* ============================================================
-
-   ANIMATION LOOP
-
-============================================================ */
-
-function animate(){
-
-    requestAnimationFrame(
-
-        animate
-
-    );
-
-    if(controls){
-
-        controls.update();
-
-    }
-
-    /*
-
-     * Do NOT continuously rewrite bone
-
-     * rotations here.
-
-     *
-
-     * Only update skeleton matrices.
-
-     */
-
-    if(characterModel){
-
-        characterModel.traverse(
-
-            child => {
-
-                if(
-
-                    child.isSkinnedMesh &&
-
-                    child.skeleton
-
-                ){
-
-                    child.skeleton.update();
-
+                if (!matched) {
+                    for (const alias of joint.aliases) {
+                        const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        matched = allBoneNames.find(name => {
+                            const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            return cleanName.endsWith(cleanAlias) || cleanName.includes(cleanAlias);
+                        });
+                        if (matched) break;
+                    }
                 }
 
+                if (matched) boneMap[joint.key] = matched;
+            });
+        }
+
+        function populateBoneDropdown() {
+            const select = document.getElementById('sel-bone');
+            select.innerHTML = '';
+
+            const stdGroup = document.createElement('optgroup');
+            stdGroup.label = "── Major Body Joints ──";
+
+            ANATOMICAL_JOINTS.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.key;
+                const actual = boneMap[item.key];
+                opt.innerText = item.label + (actual ? ` (${actual})` : ' [❌]');
+                stdGroup.appendChild(opt);
+            });
+            select.appendChild(stdGroup);
+
+            const rawBones = Object.keys(bones).sort();
+            if (rawBones.length > 0) {
+                const allGroup = document.createElement('optgroup');
+                allGroup.label = "── All Raw Rig Bones ──";
+                rawBones.forEach(bName => {
+                    const opt = document.createElement('option');
+                    opt.value = "raw:" + bName;
+                    opt.innerText = bName;
+                    allGroup.appendChild(opt);
+                });
+                select.appendChild(allGroup);
             }
 
-        );
+            loadBoneRotations();
+        }
 
-    }
+        function getActualBoneName(keyOrRaw) {
+            if (!keyOrRaw) return null;
+            if (keyOrRaw.startsWith("raw:")) return keyOrRaw.substring(4);
+            return boneMap[keyOrRaw] || null;
+        }
 
-    renderer.render(
+        function loadBoneRotations() {
+            const val = document.getElementById('sel-bone').value;
+            const actualName = getActualBoneName(val);
+            const delta = (actualName && currentDeltas[actualName]) ? currentDeltas[actualName] : { x: 0, y: 0, z: 0 };
 
-        scene,
+            document.getElementById('rot-x').value = delta.x;
+            document.getElementById('rot-y').value = delta.y;
+            document.getElementById('rot-z').value = delta.z;
+            document.getElementById('val-rx').innerText = delta.x + '°';
+            document.getElementById('val-ry').innerText = delta.y + '°';
+            document.getElementById('val-rz').innerText = delta.z + '°';
+        }
 
-        camera
+        function updateBoneRotation() {
+            const val = document.getElementById('sel-bone').value;
+            const actualName = getActualBoneName(val);
+            if (!actualName || !bones[actualName]) return;
 
-    );
+            const dx = parseFloat(document.getElementById('rot-x').value);
+            const dy = parseFloat(document.getElementById('rot-y').value);
+            const dz = parseFloat(document.getElementById('rot-z').value);
 
-}
+            applyRotationToBoneName(actualName, dx, dy, dz);
 
-/* ============================================================
+            document.getElementById('val-rx').innerText = dx + '°';
+            document.getElementById('val-ry').innerText = dy + '°';
+            document.getElementById('val-rz').innerText = dz + '°';
+        }
 
-   START
+        // Direct Local Transform + Synchronized Matrix Hierarchy
+        function applyRotationToBoneName(boneName, dx, dy, dz) {
+            const b = bones[boneName];
+            if (!b || !b.userData.restQuat) return;
 
-============================================================ */
+            currentDeltas[boneName] = { x: dx, y: dy, z: dz };
 
-window.addEventListener(
+            const deltaEuler = new THREE.Euler(
+                THREE.MathUtils.degToRad(dx),
+                THREE.MathUtils.degToRad(dy),
+                THREE.MathUtils.degToRad(dz),
+                'XYZ'
+            );
+            const deltaQuat = new THREE.Quaternion().setFromEuler(deltaEuler);
 
-    'load',
+            b.quaternion.copy(b.userData.restQuat).multiply(deltaQuat);
+            b.updateMatrix();
 
-    init
+            // World Matrix အား အဆင့်ဆင့် အသစ်ပြန်တွက်စေပြီးမှ Skeleton Buffer ကို အသစ်ပြင်ဆင်ခြင်း
+            characterModel.updateMatrixWorld(true);
+            characterModel.traverse((child) => {
+                if (child.isSkinnedMesh && child.skeleton) {
+                    child.skeleton.update();
+                }
+            });
+        }
 
-);
+        function resetCurrentBone() {
+            const val = document.getElementById('sel-bone').value;
+            const actualName = getActualBoneName(val);
+            document.getElementById('rot-x').value = 0;
+            document.getElementById('rot-y').value = 0;
+            document.getElementById('rot-z').value = 0;
+            if (actualName) applyRotationToBoneName(actualName, 0, 0, 0);
+            loadBoneRotations();
+        }
 
-</script>
+        function resetAllBonesToRestPose() {
+            Object.keys(bones).forEach(bName => {
+                const b = bones[bName];
+                if (b && b.userData.restQuat) {
+                    b.quaternion.copy(b.userData.restQuat);
+                    b.updateMatrix();
+                    currentDeltas[bName] = { x: 0, y: 0, z: 0 };
+                }
+            });
+            if (characterModel) {
+                characterModel.updateMatrixWorld(true);
+                characterModel.traverse((child) => {
+                    if (child.isSkinnedMesh && child.skeleton) child.skeleton.update();
+                });
+            }
+            loadBoneRotations();
+        }
 
+        // Posing Presets Calibrated for MakeHuman Skeleton
+        function applyPresetPose(pose) {
+            resetAllBonesToRestPose();
+
+            const applyJointDelta = (jointKey, dx, dy, dz) => {
+                const actualName = boneMap[jointKey];
+                if (actualName) applyRotationToBoneName(actualName, dx, dy, dz);
+            };
+
+            if (pose === 'contrapposto') {
+                applyJointDelta('pelvis', 0, 0, -5);
+                applyJointDelta('waist', 3, 5, 5);
+                applyJointDelta('chest', -2, -4, 2);
+                applyJointDelta('head', 4, -14, 2);
+                applyJointDelta('upperleg_r', -6, 0, 4);
+                applyJointDelta('upperleg_l', 25, -5, -8);
+                applyJointDelta('lowerleg_l', -35, 0, 0);
+                applyJointDelta('upperarm_r', 12, 0, 15);
+                applyJointDelta('lowerarm_r', 0, 0, 25);
+                applyJointDelta('upperarm_l', 6, 0, -10);
+            } else if (pose === 'sitting') {
+                applyJointDelta('upperleg_l', -85, 4, -6);
+                applyJointDelta('upperleg_r', -85, -4, 6);
+                applyJointDelta('lowerleg_l', 90, 0, 0);
+                applyJointDelta('lowerleg_r', 90, 0, 0);
+                applyJointDelta('waist', 8, 0, 0);
+                applyJointDelta('chest', 4, 0, 0);
+                applyJointDelta('lowerarm_l', -25, 0, 0);
+                applyJointDelta('lowerarm_r', -25, 0, 0);
+            } else if (pose === 'walking') {
+                applyJointDelta('pelvis', 0, 10, 0);
+                applyJointDelta('upperleg_r', -35, 4, 0);
+                applyJointDelta('lowerleg_r', 20, 0, 0);
+                applyJointDelta('upperleg_l', 25, -4, 0);
+                applyJointDelta('lowerleg_l', -30, 0, 0);
+                applyJointDelta('upperarm_l', -30, 8, 12);
+                applyJointDelta('lowerarm_l', -20, 0, 0);
+                applyJointDelta('upperarm_r', 25, -6, -12);
+                applyJointDelta('waist', 4, -10, 0);
+            } else if (pose === 'folded_arms') {
+                applyJointDelta('upperarm_l', 25, 38, 20);
+                applyJointDelta('lowerarm_l', -80, 20, 25);
+                applyJointDelta('upperarm_r', 25, -38, -20);
+                applyJointDelta('lowerarm_r', -80, -20, -25);
+                applyJointDelta('waist', 2, 0, 0);
+            } else if (pose === 'thinker') {
+                applyJointDelta('upperleg_l', -75, 4, 0);
+                applyJointDelta('upperleg_r', -75, -4, 0);
+                applyJointDelta('lowerleg_l', 80, 0, 0);
+                applyJointDelta('lowerleg_r', 80, 0, 0);
+                applyJointDelta('waist', 25, -12, 0);
+                applyJointDelta('chest', 15, -6, 0);
+                applyJointDelta('head', -25, 18, 0);
+                applyJointDelta('upperarm_r', -55, 25, 20);
+                applyJointDelta('lowerarm_r', -95, 25, 0);
+            }
+
+            loadBoneRotations();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = init;
+    </script>
 </body>
-
 </html>
